@@ -5,7 +5,8 @@
 % Copyright 2022 Darcey Graham
 clear, close all
 
-rng('shuffle');     % To prevent using the same random seed every run
+rng_seed = 'shuffle' % Needs to be 'shuffle', or int
+rng(rng_seed);
 
 % Add paths to functions. Note may need to change for different OS, eg
 % Linux users will need to replace \ with /.
