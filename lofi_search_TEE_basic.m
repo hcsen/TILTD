@@ -5,20 +5,16 @@
 % Copyright 2022 Darcey Graham
 clear, close all
 
-rng_seed = 'shuffle' % Needs to be 'shuffle', or int
-rng(rng_seed);
-
-% Add paths to functions. Note may need to change for different OS, eg
-% Linux users will need to replace \ with /.
-rootFolderName = fileparts(which('lofi_search.m'));
-addpath([rootFolderName,'\Functions'])
+rng_seed = 'shuffle'; % Needs to be 'shuffle', or int
+mice_path = {'..', 'mice'};   % Path to mice library.
+kernel_path = {'Kernels', 'saturn_ev.tm'};  % Path to kernel
 
 % User: add paths to your MICE library for SPICE
-addpath('C:\Users\hcsen\Documents\MATLAB\mice\lib')
-addpath('C:\Users\hcsen\Documents\MATLAB\mice\src\mice')
+% 'fullfile' allows contructing paths OS independently.
+addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'));
 
 % Load the generic kernel(s) for ephemeris data
-cspice_furnsh( {'C:\Users\hcsen\Documents\MATLAB\TILTD 1.1\saturn_ev.tm'} )
+cspice_furnsh( { fullfile(kernel_path{:} ) } );
 
 %% User inputs - mission constants
 
@@ -167,6 +163,11 @@ dt_min = [1,1]*86400/TU;          % Minimum time of flight in TU
 dt_max = [7,3]*86400/TU;          % Maximum time of flight in TU
 mf_min = [12.5,12.5]/MU;                % Minimum final mass in MU
 mf_max = [14,14]/MU;                % Maximum final mass in MU
+
+%%% Above is input parameters.
+%%% Below is code.
+
+rng(rng_seed);
 
 % Control vector. Need one in the x,y,z directions for each impulse in each
 % phase that permits thrust. Shouldn't need to use anything besides bounds
