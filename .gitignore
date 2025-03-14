@@ -1,4 +1,6 @@
 # A .gitignore file is a list of files to be ignored by git.
 
-Profile/*  # I have profile data in my local repo I don't want to add
-*.asv      # Matlab autosave files.
+# I have profile data in my local repo I don't want to add
+Profile/*
+# Matlab autosave files.
+*.asv
