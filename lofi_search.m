@@ -3,7 +3,16 @@
 % and bounds on variables, and must supply ephemeris data through SPICE.
 % Part of the Tool for Initial Low-Thrust Design (TILTD).
 % Copyright 2022 Darcey Graham
-% clear, close all
+
+
+function lofi_search(varargin)
+
+assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
+
+for i = 1:length(varargin)
+    disp(['Reading input ''', varargin{i}, '''']);
+    eval(varargin{i});
+end
 
 
 % User: add paths to your MICE library for SPICE
@@ -385,3 +394,4 @@ plot_lofiSF(optimised, consts);
 % dlmwrite('FILE_NAME_HERE_viol.csv', violation, 'delimiter', ',', 'precision', 20);
 % dlmwrite('FILE_NAME_HERE_lb.csv', lb, 'delimiter', ',', 'precision', 20);
 % dlmwrite('FILE_NAME_HERE_ub.csv', ub, 'delimiter', ',', 'precision', 20);
+end
