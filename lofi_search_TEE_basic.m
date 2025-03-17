@@ -9,6 +9,8 @@ rng_seed = 'shuffle'; % Needs to be 'shuffle', or int
 mice_path = {'..', 'mice'};   % Path to mice library.
 kernel_path = {'Kernels', 'saturn_ev.tm'};  % Path to kernel
 
+use_parallel = false;   % whether to use parpool or not.
+
 % User: add paths to your MICE library for SPICE
 % 'fullfile' allows contructing paths OS independently.
 addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'));
@@ -166,6 +168,21 @@ mf_max = [14,14]/MU;                % Maximum final mass in MU
 
 %%% Above is input parameters.
 %%% Below is code.
+
+if use_parallel
+    pc = parcluster('local'); % Get cluster settings for local run.
+    tmpdir = getenv('TMPDIR');
+    num_cpus = str2num(getenv('SLURM_CPUS_PER_TASK'));
+    if isfolder(tmpdir)
+        pc.JobStorageLocation = tmpdir; % Set to use system TMPDIR (faster run).
+    end
+    if isinteger(num_cpus) % If inside slurm script, use SLURM_CPUS_PER_TASK.
+                       % Otherwise matlab decides.
+        parpool(pc, num_cpus)
+    else
+        parpool(pc);
+    end
+end
 
 rng(rng_seed);
 
@@ -343,7 +360,7 @@ b = [];
 Aeq = [];           % Aeq.x = beq
 beq = [];
 options = optimoptions('fmincon','Algorithm','sqp','ConstraintTolerance', NLP_feas_tol, 'OptimalityTolerance', ...
-    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display','iter');
+    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display','iter', 'UseParallel', use_parallel);
 
 NpCurrent = 1;
 
