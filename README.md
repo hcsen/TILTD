@@ -24,3 +24,22 @@ wget https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/sat441.bs
 wget https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls.pc
 wget https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc
 ```
+
+
+## Running code.
+
+Call `lofi_search` followed by any number of input files.
+
+e.g. 
+
+```matlab
+lofi_search    TEE_basics    hpc_conf
+```
+
+Where `TEE_basics` contains mission info, and `hpc_conf` contains site specific info.
+
+
+### Note
+
+site specific setup should be moved outside of config eventually.
+

@@ -10,4 +10,4 @@
 module load MATLAB/2023b
 
 # Run the MATLAB script MATLAB_job.m 
-matlab -nodisplay < lofi_search_TEE_basic.m
+matlab -batch "addpath('Inputs'); lofi_search TEE_basic hpc_conf"
