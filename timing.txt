@@ -1,0 +1,8 @@
+Hardware                 CPUs        Time /s            Efficiency
+
+Balanced Henry              2           656
+High Performance Henry      2           622
+wmc                         2           664             1
+wmc                         4           456             0.72
+wmc                         8           308             0.54
+wmc                         12          286             0.38

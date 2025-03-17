@@ -5,19 +5,18 @@
 % Copyright 2022 Darcey Graham
 clear, close all
 
-rng('shuffle');     % To prevent using the same random seed every run
+rng_seed = 'shuffle'; % Needs to be 'shuffle', or int
+mice_path = {'..', 'mice'};   % Path to mice library.
+kernel_path = {'Kernels', 'saturn_ev.tm'};  % Path to kernel
 
-% Add paths to functions. Note may need to change for different OS, eg
-% Linux users will need to replace \ with /.
-rootFolderName = fileparts(which('lofi_search.m'));
-addpath([rootFolderName,'\Functions'])
+use_parallel = false;   % whether to use parpool or not.
 
 % User: add paths to your MICE library for SPICE
-addpath('C:\Users\hcsen\Documents\MATLAB\mice\lib')
-addpath('C:\Users\hcsen\Documents\MATLAB\mice\src\mice')
+% 'fullfile' allows contructing paths OS independently.
+addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'));
 
 % Load the generic kernel(s) for ephemeris data
-cspice_furnsh( {'C:\Users\hcsen\Documents\MATLAB\TILTD 1.1\saturn_ev.tm'} )
+cspice_furnsh( { fullfile(kernel_path{:} ) } );
 
 %% User inputs - mission constants
 
@@ -166,6 +165,26 @@ dt_min = [1,1]*86400/TU;          % Minimum time of flight in TU
 dt_max = [7,3]*86400/TU;          % Maximum time of flight in TU
 mf_min = [12.5,12.5]/MU;                % Minimum final mass in MU
 mf_max = [14,14]/MU;                % Maximum final mass in MU
+
+%%% Above is input parameters.
+%%% Below is code.
+
+if use_parallel
+    pc = parcluster('local'); % Get cluster settings for local run.
+    tmpdir = getenv('TMPDIR');
+    num_cpus = str2num(getenv('SLURM_CPUS_PER_TASK'));
+    if isfolder(tmpdir)
+        pc.JobStorageLocation = tmpdir; % Set to use system TMPDIR (faster run).
+    end
+    if isinteger(num_cpus) % If inside slurm script, use SLURM_CPUS_PER_TASK.
+                       % Otherwise matlab decides.
+        parpool(pc, num_cpus)
+    else
+        parpool(pc);
+    end
+end
+
+rng(rng_seed);
 
 % Control vector. Need one in the x,y,z directions for each impulse in each
 % phase that permits thrust. Shouldn't need to use anything besides bounds
@@ -341,7 +360,7 @@ b = [];
 Aeq = [];           % Aeq.x = beq
 beq = [];
 options = optimoptions('fmincon','Algorithm','sqp','ConstraintTolerance', NLP_feas_tol, 'OptimalityTolerance', ...
-    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display','iter');
+    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display','iter', 'UseParallel', use_parallel);
 
 NpCurrent = 1;
 
