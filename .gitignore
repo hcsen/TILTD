@@ -4,3 +4,5 @@
 Profile/*
 # Matlab autosave files.
 *.asv
+# Kernels are too big to upload.
+Kernels/*
