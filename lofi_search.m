@@ -173,7 +173,7 @@ for i = 1:N_thrust
 end
 
 % Stuff that all phases have
-dt_all(Np) = (dt_max(Np) - dt_min(Np))*rand + dt_min(Np);
+dt_all(Np) = (dt_max(N_thrust) - dt_min(N_thrust))*rand + dt_min(N_thrust);
 
 %% Convert units
 
