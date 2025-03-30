@@ -3,25 +3,25 @@
 % Celestial system
 N_perts = 2;                         % Number of perturbing bodies
 centralBodyName = 'Saturn';             % Central body name in words
-pertNames = strsplit('Titan,Enceladus', ',');       % Perturbing bodies in words
+pertNames = strsplit('Enceladus, Dione', ',');       % Perturbing bodies in words
 pertRelativeTo = 'SATURN BARYCENTER';     % System barycentre name in words
 
 Np = 2;                              % Number of trajectory phases
 N_flybys = 1;                        % Number of flybys
 
 % Flybys numbered 1,2,3 etc according to order given in pertNames
-flybySequence = [2];
+flybySequence = [1];
 whichFlyby = [1];                    % List which phases end in a flyby
 
 % For start and end, 1 = SOI, 2 = orbit around central body, then index of the
 % perturbing bodies + 2. Start at SOI specified with RA and DEC, orbit
 % specified by Keplerian orbital elements a, AoP, e, inc, RAAN, t_anom.
-startBody = 3;
-endBody = 3;
+startBody = 4;
+endBody = 4;
 
 N = 50;                              % Number of segments per trajectory phase
 
-N_ephem = 8000;                      % Number of points over which to get ephemeris data
+N_ephem = 2000;                      % Number of points over which to get ephemeris data
 N_thrust = 2;                        % Number of thrust arcs
 whichThrust = [1,2];                 % List of which phases have thrust
 
@@ -45,7 +45,7 @@ G = 6.674e-20;                       % Gravitational constant in km^3 kg^-1 s^-2
 % Provide masses of central body all perturbing bodies in order given
 % before in kg
 m_central = 5.683e26;                % Central body mass (Saturn)
-m_perts = [1.345e23, 1.080e20];      % Titan, Enceladus
+m_perts = [1.080e20, 1.095e21];      % Enceladus, Dione
 
 % Compute standard gravitational parameter of all perturbing bodies
 mu_central = m_central*G;            % Central body standard gravitational parameter in km^3/s^2
@@ -53,7 +53,7 @@ mu_perts = m_perts.*G;               % Perturbing bodies standard gravitational 
 
 % Radii of central body and perturbing bodies in km
 r_central = 58232;                  % Radius of central body in km
-r_perts = [2574.7, 252.1];          % Titan, Enceladus
+r_perts = [252.1, 561.4];            % Enceladus, Dione
 
 % Get sphere of influence radii
 d_Scent = 1.434e9;                  % Average distance of Sun to central body in km;
@@ -79,8 +79,8 @@ VU = DU/TU;                          % Velocity unit in km/s
 % phase.
 % For final phase: vinfi but no vinff because not doing a GA
 
-h_mins = [100];                     % Minimum height above flyby body in km
-h_maxs = [10000];                   % Maximum height above flyby body in km
+h_mins = [50];                     % Minimum height above flyby body in km
+h_maxs = [1000];                   % Maximum height above flyby body in km
 
 t_ephem_min = 'January 1 2035';      % Time to start fetching planetary ephemeris data, must be string of form Month d yyyy
 t_ephem_max = 'June 1 2035';      % End of time ephemeris data taken over
@@ -142,6 +142,6 @@ vz_free_max = 15/VU;
 % Set bounds for things present in every phase, one value for each per
 % phase
 dt_min = [1,1]*86400/TU;          % Minimum time of flight in TU
-dt_max = [7,3]*86400/TU;          % Maximum time of flight in TU
+dt_max = [1.5,1.5]*86400/TU;          % Maximum time of flight in TU
 mf_min = [12.5,12.5]/MU;                % Minimum final mass in MU
 mf_max = [14,14]/MU;                % Maximum final mass in MU

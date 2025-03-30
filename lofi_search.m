@@ -6,7 +6,7 @@
 
 
 function lofi_search(varargin)
-
+tic
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
 
 for i = 1:length(varargin)
@@ -384,7 +384,8 @@ end
 violation = output.constrviolation;
 
 plot_lofiSF(optimised, consts);
-
+violation
+toc
 %% Save result
 
 % Saves the optimised result, constants, constraint violation, lower and
