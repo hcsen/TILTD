@@ -9,9 +9,14 @@ function lofi_search(varargin)
 tic
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
 
+% Load inputs
 for i = 1:length(varargin)
-    disp(['Reading input ''', varargin{i}, '''']);
-    eval(varargin{i});
+    inputPath = strsplit(varargin{i},{'/','\'});
+    fileName = inputPath(end);
+    parentPath = inputPath(1:end-1);
+    addpath(fullfile(parentPath{:}))
+    disp(['Reading input ''', fileName{:}, '''']);
+    eval(fileName{:});
 end
 
 
