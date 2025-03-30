@@ -43,3 +43,33 @@ Where `TEE_basics` contains mission info, and `hpc_conf` contains site specific 
 
 site specific setup should be moved outside of config eventually.
 
+## Using Git
+
+### Checking status 
+
+```matlab
+!git status
+```
+
+### Before you make any changes to the code
+
+```matlab
+!git pull
+```
+
+There shouldn't ever be issues with this command. Seek help if there are.
+
+### When you are done making changes
+
+```matlab
+!git add <files you want recorded>
+!git commit -m "description of changes"
+!git push
+```
+
+If there are no files in your working directory that you don't want recorded (and arn't listed in `.gitignore`) you can use `!git add --all` instead of listing files.
+
+## Kernels
+
+Note, paths in meta kernel files are relative to current working directory, not kernel file. 
+Therefore, scripts should always be run from same directory else meta-kernels will not work.
