@@ -73,3 +73,5 @@ If there are no files in your working directory that you don't want recorded (an
 
 Note, paths in meta kernel files are relative to current working directory, not kernel file. 
 Therefore, scripts should always be run from same directory else meta-kernels will not work.
+
+As kernels are not recorded in the repo (too big), I reccomend making a `Kernels` directory and putting all kernels in there.
