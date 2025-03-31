@@ -1,5 +1,7 @@
 %% User inputs - mission constants
 
+rng_seed = 1;
+
 % Celestial system
 N_perts = 2;                         % Number of perturbing bodies
 centralBodyName = 'Saturn';             % Central body name in words
