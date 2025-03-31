@@ -14,11 +14,19 @@ for i = 1:length(varargin)
     inputPath = strsplit(varargin{i},{'/','\'});
     fileName = inputPath(end);
     parentPath = inputPath(1:end-1);
-    addpath(fullfile(parentPath{:}))
+    if size(parentPath)>0
+        addpath(fullfile(parentPath{:}))
+    end
     disp(['Reading input ''', fileName{:}, '''']);
     eval(fileName{:});
 end
 
+% Determine if MBH stage will be run.
+
+isMbh = exist('MBH_noLoops', 'var');
+disp(["MBH: ", isMbh]);
+disp(["Parallel: ", use_parallel]);
+disp(["Seed: ", rng_seed]);
 
 % User: add paths to your MICE library for SPICE
 % 'fullfile' allows contructing paths OS independently.
@@ -43,6 +51,12 @@ if use_parallel
 end
 
 rng(rng_seed);
+
+
+% Keep track of some indices for MBH
+ind_vinfi = zeros(3, N_flybys);
+ind_vinff = zeros(3, N_flybys);
+dtIndex = zeros(1, Np);
 
 % Control vector. Need one in the x,y,z directions for each impulse in each
 % phase that permits thrust. Shouldn't need to use anything besides bounds
@@ -118,7 +132,8 @@ elseif startBody == 2
     inci = (inci_max - inci_min)*rand + inci_min;                                       % Inclination in radians
     RAANi = (RAANi_max - RAANi_min)*rand + RAANi_min;                     % Right ascension of ascending node Omega in radians
     TAi = (TAi_max - TAi_min)*rand + TAi_min;
-% Else if start at perturbing body
+
+    % Else if start at perturbing body
 else
     viRel = [viRel_bound*(2*rand - 1), viRel_bound*(2*rand - 1), viRel_bound*(2*rand - 1)];
 end
@@ -178,7 +193,7 @@ for i = 1:N_thrust
 end
 
 % Stuff that all phases have
-dt_all(Np) = (dt_max(N_thrust) - dt_min(N_thrust))*rand + dt_min(N_thrust);
+dt_all(Np) = (dt_max(N_thrust) - dt_min(N_thrust))*rand + dt_min(N_thrust); % THIS DIFFERS IN MBH 'dt_all(Np) = (dt_max(i) - dt_min(i))*rand + dt_min(i);'
 
 %% Convert units
 
@@ -231,6 +246,8 @@ optim_store = zeros(Np, noDecision);
 viol_store = zeros(Np);
 lb_store = zeros(Np, noDecision);
 ub_store = zeros(Np, noDecision);
+objInd = zeros(1,Np);
+phaseSizes = zeros(1,Np);
 
 % First phase if starts on SOI
 if startBody == 1
@@ -256,10 +273,15 @@ end
 
 % If first phase ends in flyby
 if whichFlyby(1) == 1
+    indNow = length(x);
     x = [x, vinfi_all(:,1).', vinff_all(:,1).'];
     lb = [lb, -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1)];
     ub = [ub vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1)];
-
+    if isMbh
+        % Need index of velocity for MBH
+        ind_vinfi(:,1) = indNow+1:indNow+3;
+        ind_vinff(:,1) = indNow+4:indNow+6;
+    end
 % Else the first phase ends in a point in free space
 else
     x = [x, r_free(:,1).', v_free(:,1).'];
@@ -269,6 +291,7 @@ end
 
 thrustInd = 1;
 sizeX = length(x);
+dtIndex(1) = indLastDt;
 
 % If first phase is a thrust arc
 if whichThrust(1) == 1
@@ -278,18 +301,18 @@ if whichThrust(1) == 1
     thrustInd = 2;
 end
 
-% plot_lofiSF(x, consts);
-
 % Supply index of last final mass, or tell optimiser to optimise the
 % minimum flight time if no thrust arcs
 if whichThrust(1) == 1
     indLastMf = sizeX + 1;
+    objInd(1) = indLastMf;
     [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+    phaseSizes(1) = length(optimised);
 else
+    objInd(1) = indLastDt;
     [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+    phaseSizes(1) = length(optimised);
 end
-
-% plot_lofiSF(optimised, consts);
 
 %% Intermediate phases
 
@@ -297,12 +320,13 @@ NpCurrent = 2;
 
 if Np > 2
     for i = 2:Np-1
-        sizeOptim = length(x);
+        sizeOptim = length(x);  % THIS DIFFERS FROM MBH 'sizeOptim = length(optimised);'
         consts(7) = NpCurrent;
         x = [optimised, dt_all(i)];
         lb = [lb, dt_min(i)];
         ub = [ub, dt_max(i)];
-
+        indLastDt = sizeOptim+1;
+        dtIndex(i) = indLastDt;
         % If this phase ends in a flyby
         if any(i == whichFlyby)
             x = [x, vinfi_all(:,i).', vinff_all(:,i).'];
@@ -324,16 +348,21 @@ if Np > 2
             thrustInd = thrustInd+1;
             
             indLastMf = sizeOptim + 8;
+            objInd(i) = indLastMf;
             [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-            
+            phaseSizes(i) = length(optimised);
         else
             % If there has been a thrust arc in the past, optimise for its
             % final mass
             if any(i <= whichThrust)
+                objInd(i) = indLastMf;
                 [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+                phaseSizes(i) = length(optimised);
             else
                 indLast = sizeOptim + 1;
+                objInd(i) = indLastDt;
                 [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+                phaseSizes(i) = length(optimised);
             end
         end
         
@@ -346,6 +375,7 @@ end
 consts(7) = Np;
 
 sizeOptim = length(x);
+indLastDt = sizeOptim+1;
 
 % If ends on SOI
 if endBody == 1
@@ -366,6 +396,8 @@ else
     ub = [ub, dt_max(end), vfRel_bound,vfRel_bound,vfRel_bound];
 end
 
+dtIndex(end) = indLastDt;
+
 % If phase is a thrust arc
 if whichThrust(end) == Np
     x = [x, mf_all(end), u_all(1+(N_thrust-1)*3,:), u_all(2+(N_thrust-1)*3,:), u_all(3+(N_thrust-1)*3,:)];
@@ -373,31 +405,249 @@ if whichThrust(end) == Np
     ub = [ub, mf_max(end), u_max(1+(N_thrust-1)*3,:), u_max(2+(N_thrust-1)*3,:), u_max(3+(N_thrust-1)*3,:)];
     
     indLastMf = sizeOptim + 5;
-    [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-    
+    objInd(Np) = indLastMf;
+    [optimised,m_optim, exitflag,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+    phaseSizes(Np) = length(optimised);
 else
     % If there has been a thrust arc in the past, optimise for its
     % final mass
     if N_thrust ~= 0
-        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-    else
+        objInd(Np) = indLastMf;
+        [optimised,m_optim, exitflag,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+        phaseSizes(Np) = length(optimised);
+        else
         indLast = sizeOptim + 1;
-        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+        objInd(Np) = indLastDt;
+        [optimised,m_optim, exitflag,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+        phaseSizes(Np) = length(optimised);
     end
 end
 
-violation = output.constrviolation;
+if isMbh
+    %% MBH setup
 
-plot_lofiSF(optimised, consts);
-violation
-toc
+    % First phase
+    if startBody == 1
+        sigmas = [s_t0, s_angles, s_angles, s_v, s_v, s_v];
+        
+        % Or, if trajectory starts in orbit around central body
+    elseif startBody == 2
+        sigmas = [s_t0, s_a, s_angles, s_e, s_angles, s_angles, s_angles];
+        
+        % Or, if trajectory starts at location of perturbing body
+    else
+        sigmas = [s_t0, s_v, s_v, s_v];
+    end
+
+    % If first phase ends in flyby
+    if whichFlyby(1) == 1
+        sigmas = [sigmas, s_dt, s_v,s_v,s_v, s_v,s_v,s_v];
+    else
+        sigmas = [sigmas, s_dt, s_r, s_r, s_r, s_v, s_v, s_v];
+    end
+
+    if whichThrust(1) == 1
+        sigmas = [sigmas, s_m, s_u*ones(1,3*N)];
+    end
+
+    % Intermediate phases
+    if Np > 2
+        for i = 2:Np-1
+            sigmas = [sigmas, s_dt];
+            
+            % If ends in flyby
+            if any(i == whichFlyby)
+                sigmas = [sigmas, s_v,s_v,s_v, s_v,s_v,s_v];
+            else
+                sigmas = [sigmas, s_r, s_r, s_r, s_v, s_v, s_v];
+            end
+
+            % If phase is a thrust arc
+            if any(i==whichThrust)
+                sigmas = [sigmas, s_m, s_u*ones(1,N*3)];
+            end
+        end
+    end
+
+    % Final phase
+    if endBody == 1
+        sigmas = [sigmas, s_dt, s_angles, s_angles, s_v,s_v,s_v];
+
+        % Or, if trajectory ends in orbit around central body
+    elseif endBody == 2
+        sigmas = [sigmas, s_dt, s_a, s_angles, s_e, s_angles, s_angles, s_angles];
+        
+        % Or, if trajectory ends at location of perturbing body
+    else
+        sigmas = [sigmas, s_dt, s_v,s_v,s_v];
+    end
+
+    if whichThrust(end) == Np
+        sigmas = [sigmas, s_m, s_u*ones(1,3*N)];
+    end
+
+    probSize = length(optimised);
+    
+    optim_archive = zeros(MBH_noLoops, probSize); % For optimised decision variables at each iteration
+    m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
+    violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
+    times = zeros(MBH_noLoops, 1);
+
+    % Save to archive if the optimised trajectory is feasible
+    optim_archive(1,:) = optimised;         % Save all optimised decision variables
+    m_archive(1) = m_optim;               % Save final mass from that optimised run
+    violation_archive(1) = output.constrviolation;
+    % times(1) = toc;
+
+    % For resolving, know where optimising over dt and where mf
+
+    %% MBH loop
+
+    for k = 2:MBH_noLoops
+        
+        % Perturb all the decision variables in the already-optimised
+        % trajectory. Multiply by either 1 or -1 because Pareto distribution
+        % doesn't allow negative values, which we want
+        pm = fix(rand(1,probSize)+0.5);
+        pm(~pm) = -1;
+        perturbed = optimised + gprnd(MBH_tail, sigmas, MBH_theta*ones(1,probSize)).*pm;
+
+        % Or, come up with an entirely new random guess
+        if rand < rho_hop           % If a random number is below a value, hop
+            disp(k)
+            
+            % Hop the launch epoch
+            perturbed(1) = perturbed(1) + 2*t0Hop*rand - t0Hop;
+            
+            % Hop each phase tof
+            for j = 1:Np
+                perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2*dtHop*rand - dtHop;
+            end
+        end                 % End hop to new point
+        
+        % If any decision variables have gone outside the bounds, set them to
+        % be equal to the lower or upper bound
+        for j = 1:probSize
+            if perturbed(j) < lb(j)
+                perturbed(j) = lb(j);
+                % Make sure the elements of vinfi ~= vinff or will crash optimisation
+                if N_flybys > 0
+                    for vind = 1:N_flybys
+                        if norm(perturbed(ind_vinfi((1:3)+(vind-1)*3))) == norm(perturbed(ind_vinff((1:3)+(vind-1)*3)))
+                        % Adjust vinfi accordingly, making it larger if it's on
+                        % the lower bound, smaller if on upper bound
+                            for f = 1:3
+                                if perturbed(ind_vinfi(f + (vind-1)*3)) < 0
+                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) + s_v*rand;
+                                else
+                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) - s_v*rand;
+                                end
+                            end                    
+                        end
+                    end
+                end
+            elseif perturbed(j) > ub(j)
+                perturbed(j) = ub(j);
+                % Make sure the elements of vinfi ~= vinff or will crash optimisation
+                if N_flybys > 0
+                    for vind = 1:N_flybys
+                        if norm(perturbed(ind_vinfi((1:3)+(vind-1)*3))) == norm(perturbed(ind_vinff((1:3)+(vind-1)*3)))
+                        % Adjust vinfi accordingly, making it larger if it's on
+                        % the lower bound, smaller if on upper bound
+                            for f = 1:3
+                                if perturbed(ind_vinfi(f + (vind-1)*3)) < 0
+                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) + s_v*rand;
+                                else
+                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) - s_v*rand;
+                                end
+                            end      
+                        end
+                    end
+                end
+            end
+        end
+        
+        % Re-optimise first phase
+        consts(7) = 1;
+        if whichThrust(1) == 1
+            lbCurrent = lb(1:phaseSizes(1));
+            ubCurrent = ub(1:phaseSizes(1));
+            x = perturbed(1:phaseSizes(1));
+            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(1)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
+            perturbed(1:phaseSizes(1)) = optimised;
+        else
+            lbCurrent = lb(1:phaseSizes(1));
+            ubCurrent = ub(1:phaseSizes(1));
+            x = perturbed(1:phaseSizes(1));
+            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(1)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
+            perturbed(1:phaseSizes(1)) = optimised;
+        end
+        
+        % Re-optimise intermediate phases
+        NpCurrent = 2;
+        if Np > 2
+            for i = 2:Np-1
+                consts(7) = NpCurrent;
+                x = perturbed(1:phaseSizes(i));
+                lbCurrent = lb(1:phaseSizes(i));
+                ubCurrent = ub(1:phaseSizes(i));
+
+                % If phase is a thrust arc
+                if any(i==whichThrust)
+                    [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
+                else
+                    % If there has been a thrust arc in the past, optimise for its
+                    % final mass
+                    if any(i <= whichThrust)
+                        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
+                    else
+                        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
+                    end
+                end
+                
+                perturbed(1:phaseSizes(i)) = optimised;
+                NpCurrent = NpCurrent+1;
+            end
+        end
+        
+        % Re-optimise final phase
+        consts(7) = Np;
+        x = perturbed;
+        if whichThrust(end) == Np
+            [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+        else
+            % If there has been a thrust arc in the past, optimise for its
+            % final mass
+            if N_thrust ~= 0
+                [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+            else
+                [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+            end
+        end
+        
+        % Save to archive
+        optim_archive(k,:) = optimised;
+        m_archive(k) = m_optim;
+        violation_archive(k) = output.constrviolation;
+    end 
+
+    %% Plot best
+
+    min_viol = min(nonzeros(violation_archive));
+    best_index = find(violation_archive==min_viol);
+    best = optim_archive(best_index,:);
+else
+    violation_archive(1) = output.constrviolation;
+end
 %% Save result
 
 % Saves the optimised result, constants, constraint violation, lower and
 % upper bounds. Can replace with anything else you want to save
 % dlmwrite('FILE_NAME_HERE.csv', optimised, 'delimiter', ',', 'precision', 20);
 % dlmwrite('FILE_NAME_HERE_consts.csv', consts, 'delimiter', ',', 'precision', 20);
-% dlmwrite('FILE_NAME_HERE_viol.csv', violation, 'delimiter', ',', 'precision', 20);
+dlmwrite('viol.csv', violation_archive, 'delimiter', ',', 'precision', 20); % This is temporary, for purpose of verification.
 % dlmwrite('FILE_NAME_HERE_lb.csv', lb, 'delimiter', ',', 'precision', 20);
 % dlmwrite('FILE_NAME_HERE_ub.csv', ub, 'delimiter', ',', 'precision', 20);
+
+
 end
