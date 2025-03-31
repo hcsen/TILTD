@@ -6,3 +6,4 @@ Profile/*
 *.asv
 # Kernels are too big to upload.
 Kernels/*
+desktop.ini
