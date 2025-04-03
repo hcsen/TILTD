@@ -9,9 +9,7 @@ u_max = ones(N_thrust*3, N);
 % Not usually much need to change the defaults
 % ^^THIS IS NOT TRUE, MBH PARAMETERS MUST BE CHANGED FOR DIFFERENT SYSTEMS
 
-use_mbh = true
-MBH_noLoops > 0 
-
+MBH_noLoops = 100;
 t0Hop = 9*86400/TU;                % Max amount to hop launch epoch in TU
 dtHop = 0.2*86400/TU;                 % Max amount to hop time of flights in TU
 MBH_noLoops = 100;                  % Number of times to run
