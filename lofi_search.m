@@ -317,57 +317,54 @@ end
 %% Intermediate phases
 
 NpCurrent = 2;
+for i = 2:Np-1
+    sizeOptim = length(x);  % THIS DIFFERS FROM MBH 'sizeOptim = length(optimised);'
+    consts(7) = NpCurrent;
+    x = [optimised, dt_all(i)];
+    lb = [lb, dt_min(i)];
+    ub = [ub, dt_max(i)];
+    indLastDt = sizeOptim+1;
+    dtIndex(i) = indLastDt;
+    % If this phase ends in a flyby
+    if any(i == whichFlyby)
+        x = [x, vinfi_all(:,i).', vinff_all(:,i).'];
+        lb = [lb, -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i)];
+        ub = [ub, vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i)];
 
-if Np > 2
-    for i = 2:Np-1
-        sizeOptim = length(x);  % THIS DIFFERS FROM MBH 'sizeOptim = length(optimised);'
-        consts(7) = NpCurrent;
-        x = [optimised, dt_all(i)];
-        lb = [lb, dt_min(i)];
-        ub = [ub, dt_max(i)];
-        indLastDt = sizeOptim+1;
-        dtIndex(i) = indLastDt;
-        % If this phase ends in a flyby
-        if any(i == whichFlyby)
-            x = [x, vinfi_all(:,i).', vinff_all(:,i).'];
-            lb = [lb, -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i)];
-            ub = [ub, vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i)];
+    % Else, this phase ends at a point in free space
+    else
+        x = [x, r_free(:,i).', v_free(:,i).'];
+        lb = [lb, x_free_min(i), y_free_min(i), z_free_min(i), vx_free_min(i), vy_free_min(i), vz_free_min(i)];
+        ub = [ub, x_free_max(i), y_free_max(i), z_free_max(i), vx_free_max(i), vy_free_max(i), vz_free_max(i)];
+    end
 
-        % Else, this phase ends at a point in free space
-        else
-            x = [x, r_free(:,i).', v_free(:,i).'];
-            lb = [lb, x_free_min(i), y_free_min(i), z_free_min(i), vx_free_min(i), vy_free_min(i), vz_free_min(i)];
-            ub = [ub, x_free_max(i), y_free_max(i), z_free_max(i), vx_free_max(i), vy_free_max(i), vz_free_max(i)];
-        end
-
-        % If phase is a thrust arc
-        if any(i==whichThrust)
-            x = [x, mf_all(thrustInd), u_all(1+(thrustInd-1)*3,:), u_all(2+(thrustInd-1)*3,:), u_all(3+(thrustInd-1)*3,:)];
-            lb = [lb, mf_min(thrustInd), u_min(1+(thrustInd-1)*3,:), u_min(2+(thrustInd-1)*3,:), u_min(3+(thrustInd-1)*3,:)];
-            ub = [ub, mf_max(thrustInd), u_max(1+(thrustInd-1)*3,:), u_max(2+(thrustInd-1)*3,:), u_max(3+(thrustInd-1)*3,:)];
-            thrustInd = thrustInd+1;
-            
-            indLastMf = sizeOptim + 8;
+    % If phase is a thrust arc
+    if any(i==whichThrust)
+        x = [x, mf_all(thrustInd), u_all(1+(thrustInd-1)*3,:), u_all(2+(thrustInd-1)*3,:), u_all(3+(thrustInd-1)*3,:)];
+        lb = [lb, mf_min(thrustInd), u_min(1+(thrustInd-1)*3,:), u_min(2+(thrustInd-1)*3,:), u_min(3+(thrustInd-1)*3,:)];
+        ub = [ub, mf_max(thrustInd), u_max(1+(thrustInd-1)*3,:), u_max(2+(thrustInd-1)*3,:), u_max(3+(thrustInd-1)*3,:)];
+        thrustInd = thrustInd+1;
+        
+        indLastMf = sizeOptim + 8;
+        objInd(i) = indLastMf;
+        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+        phaseSizes(i) = length(optimised);
+    else
+        % If there has been a thrust arc in the past, optimise for its
+        % final mass
+        if any(i <= whichThrust)
             objInd(i) = indLastMf;
             [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
             phaseSizes(i) = length(optimised);
         else
-            % If there has been a thrust arc in the past, optimise for its
-            % final mass
-            if any(i <= whichThrust)
-                objInd(i) = indLastMf;
-                [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-                phaseSizes(i) = length(optimised);
-            else
-                indLast = sizeOptim + 1;
-                objInd(i) = indLastDt;
-                [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-                phaseSizes(i) = length(optimised);
-            end
+            indLast = sizeOptim + 1;
+            objInd(i) = indLastDt;
+            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+            phaseSizes(i) = length(optimised);
         end
-        
-        NpCurrent = NpCurrent+1;
     end
+    
+    NpCurrent = NpCurrent+1;
 end
 
 %% Final phase
