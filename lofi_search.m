@@ -169,21 +169,17 @@ for i = 1 : Np-1
 end
 
 % For flyby phases
-if N_flybys > 0
-    for i = 1 : N_flybys
-        vinfi_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
-        vinff_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
-    end
+for i = 1 : N_flybys
+    vinfi_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
+    vinff_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
 end
 
 % For non-flyby phases
-if N_flybys < Np - 1
-    for i = 1 : (Np-1-N_flybys)
-        r_free(:,i) = [(x_free_max - x_free_min)*rand + x_free_min; (y_free_max - y_free_min)*rand + y_free_min; ...
-            (z_free_max - z_free_min)*rand + z_free_min];
-        v_free(:,i) = [(vx_free_max - vx_free_min)*rand + vx_free_min; (vy_free_max - vy_free_min)*rand + vy_free_min; ...
-            (vz_free_max - vz_free_min)*rand + vz_free_min];
-    end
+for i = 1 : (Np-1-N_flybys)
+    r_free(:,i) = [(x_free_max - x_free_min)*rand + x_free_min; (y_free_max - y_free_min)*rand + y_free_min; ...
+        (z_free_max - z_free_min)*rand + z_free_min];
+    v_free(:,i) = [(vx_free_max - vx_free_min)*rand + vx_free_min; (vy_free_max - vy_free_min)*rand + vy_free_min; ...
+        (vz_free_max - vz_free_min)*rand + vz_free_min];
 end
 
 % Thrust arcs
@@ -448,21 +444,19 @@ if isMbh
     end
 
     % Intermediate phases
-    if Np > 2
-        for i = 2:Np-1
-            sigmas = [sigmas, s_dt];
-            
-            % If ends in flyby
-            if any(i == whichFlyby)
-                sigmas = [sigmas, s_v,s_v,s_v, s_v,s_v,s_v];
-            else
-                sigmas = [sigmas, s_r, s_r, s_r, s_v, s_v, s_v];
-            end
+    for i = 2:Np-1
+        sigmas = [sigmas, s_dt];
+        
+        % If ends in flyby
+        if any(i == whichFlyby)
+            sigmas = [sigmas, s_v,s_v,s_v, s_v,s_v,s_v];
+        else
+            sigmas = [sigmas, s_r, s_r, s_r, s_v, s_v, s_v];
+        end
 
-            % If phase is a thrust arc
-            if any(i==whichThrust)
-                sigmas = [sigmas, s_m, s_u*ones(1,N*3)];
-            end
+        % If phase is a thrust arc
+        if any(i==whichThrust)
+            sigmas = [sigmas, s_m, s_u*ones(1,N*3)];
         end
     end
 
