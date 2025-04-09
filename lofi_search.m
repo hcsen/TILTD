@@ -4,9 +4,7 @@
 % Part of the Tool for Initial Low-Thrust Design (TILTD).
 % Copyright 2022 Darcey Graham
 
-
 function lofi_search(varargin)
-tic
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
 
 % Load inputs
@@ -495,132 +493,10 @@ if isMbh
     %% MBH loop
 
     for k = 2:MBH_noLoops
-        
-        % Perturb all the decision variables in the already-optimised
-        % trajectory. Multiply by either 1 or -1 because Pareto distribution
-        % doesn't allow negative values, which we want
-        pm = fix(rand(1,probSize)+0.5);
-        pm(~pm) = -1;
-        perturbed = optimised + gprnd(MBH_tail, sigmas, MBH_theta*ones(1,probSize)).*pm;
-
-        % Or, come up with an entirely new random guess
-        if rand < rho_hop           % If a random number is below a value, hop
-            disp(k)
-            
-            % Hop the launch epoch
-            perturbed(1) = perturbed(1) + 2*t0Hop*rand - t0Hop;
-            
-            % Hop each phase tof
-            for j = 1:Np
-                perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2*dtHop*rand - dtHop;
-            end
-        end                 % End hop to new point
-        
-        % If any decision variables have gone outside the bounds, set them to
-        % be equal to the lower or upper bound
-        for j = 1:probSize
-            if perturbed(j) < lb(j)
-                perturbed(j) = lb(j);
-                % Make sure the elements of vinfi ~= vinff or will crash optimisation
-                if N_flybys > 0
-                    for vind = 1:N_flybys
-                        if norm(perturbed(ind_vinfi((1:3)+(vind-1)*3))) == norm(perturbed(ind_vinff((1:3)+(vind-1)*3)))
-                        % Adjust vinfi accordingly, making it larger if it's on
-                        % the lower bound, smaller if on upper bound
-                            for f = 1:3
-                                if perturbed(ind_vinfi(f + (vind-1)*3)) < 0
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) + s_v*rand;
-                                else
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) - s_v*rand;
-                                end
-                            end                    
-                        end
-                    end
-                end
-            elseif perturbed(j) > ub(j)
-                perturbed(j) = ub(j);
-                % Make sure the elements of vinfi ~= vinff or will crash optimisation
-                if N_flybys > 0
-                    for vind = 1:N_flybys
-                        if norm(perturbed(ind_vinfi((1:3)+(vind-1)*3))) == norm(perturbed(ind_vinff((1:3)+(vind-1)*3)))
-                        % Adjust vinfi accordingly, making it larger if it's on
-                        % the lower bound, smaller if on upper bound
-                            for f = 1:3
-                                if perturbed(ind_vinfi(f + (vind-1)*3)) < 0
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) + s_v*rand;
-                                else
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) - s_v*rand;
-                                end
-                            end      
-                        end
-                    end
-                end
-            end
-        end
-        
-        % Re-optimise first phase
-        consts(7) = 1;
-        if whichThrust(1) == 1
-            lbCurrent = lb(1:phaseSizes(1));
-            ubCurrent = ub(1:phaseSizes(1));
-            x = perturbed(1:phaseSizes(1));
-            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(1)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-            perturbed(1:phaseSizes(1)) = optimised;
-        else
-            lbCurrent = lb(1:phaseSizes(1));
-            ubCurrent = ub(1:phaseSizes(1));
-            x = perturbed(1:phaseSizes(1));
-            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(1)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-            perturbed(1:phaseSizes(1)) = optimised;
-        end
-        
-        % Re-optimise intermediate phases
-        NpCurrent = 2;
-        if Np > 2
-            for i = 2:Np-1
-                consts(7) = NpCurrent;
-                x = perturbed(1:phaseSizes(i));
-                lbCurrent = lb(1:phaseSizes(i));
-                ubCurrent = ub(1:phaseSizes(i));
-
-                % If phase is a thrust arc
-                if any(i==whichThrust)
-                    [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-                else
-                    % If there has been a thrust arc in the past, optimise for its
-                    % final mass
-                    if any(i <= whichThrust)
-                        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-                    else
-                        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-                    end
-                end
-                
-                perturbed(1:phaseSizes(i)) = optimised;
-                NpCurrent = NpCurrent+1;
-            end
-        end
-        
-        % Re-optimise final phase
-        consts(7) = Np;
-        x = perturbed;
-        if whichThrust(end) == Np
-            [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-        else
-            % If there has been a thrust arc in the past, optimise for its
-            % final mass
-            if N_thrust ~= 0
-                [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-            else
-                [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-            end
-        end
-        
-        % Save to archive
-        optim_archive(k,:) = optimised;
-        m_archive(k) = m_optim;
-        violation_archive(k) = output.constrviolation;
-    end 
+        [perturbed, optim_archive, m_archive, violation_archive] = basinhop(k, optimised, sigmas, MBH_tail, ...
+            MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
+            phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np, optim_archive, m_archive, violation_archive);
+    end
 
     %% Plot best
 
@@ -639,6 +515,5 @@ end
 dlmwrite('viol.csv', violation_archive, 'delimiter', ',', 'precision', 20); % This is temporary, for purpose of verification.
 % dlmwrite('FILE_NAME_HERE_lb.csv', lb, 'delimiter', ',', 'precision', 20);
 % dlmwrite('FILE_NAME_HERE_ub.csv', ub, 'delimiter', ',', 'precision', 20);
-
 
 end
