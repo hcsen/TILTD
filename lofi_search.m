@@ -26,9 +26,11 @@ disp(["MBH: ", isMbh]);
 disp(["Parallel: ", use_parallel]);
 disp(["Seed: ", rng_seed]);
 
+rootDir = pwd;
+
 % User: add paths to your MICE library for SPICE
 % 'fullfile' allows contructing paths OS independently.
-addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'));
+addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'), rootDir);
 
 % Load the generic kernel(s) for ephemeris data
 cspice_furnsh( { fullfile(kernel_path{:} ) } );
@@ -45,7 +47,7 @@ if use_parallel
         parpool(pc, num_cpus)
     else
         parpool(pc);
-    end
+    end    
 end
 
 rng(rng_seed);
@@ -188,6 +190,7 @@ end
 
 % Stuff that all phases have
 dt_all(Np) = (dt_max(N_thrust) - dt_min(N_thrust))*rand + dt_min(N_thrust); % THIS DIFFERS IN MBH 'dt_all(Np) = (dt_max(i) - dt_min(i))*rand + dt_min(i);'
+% dt_all(Np) = (dt_max(Np) - dt_min(N_thrust))*rand + dt_min(N_thrust); % THIS DIFFERS IN MBH 'dt_all(Np) = (dt_max(i) - dt_min(i))*rand + dt_min(i);'
 
 %% Convert units
 
@@ -491,13 +494,19 @@ if isMbh
     % For resolving, know where optimising over dt and where mf
 
     %% MBH loop
-
-    for k = 2:MBH_noLoops
-        [perturbed, optim_archive, m_archive, violation_archive] = basinhop(k, optimised, sigmas, MBH_tail, ...
-            MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
-            phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np, optim_archive, m_archive, violation_archive);
+    if use_parallel
+        for k = 2:MBH_noLoops
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, optimised, sigmas, MBH_tail, ...
+                MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
+                phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+        end
+    else
+        for k = 2:MBH_noLoops
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, optimised, sigmas, MBH_tail, ...
+                MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
+                phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+        end
     end
-
     %% Plot best
 
     min_viol = min(nonzeros(violation_archive));
