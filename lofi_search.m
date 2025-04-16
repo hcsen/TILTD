@@ -525,7 +525,7 @@ if MBH_noLoops>1
     end
 end
 
-output = struct('best', best, 'optim_archive', optim_archive, 'm_archive', m_archive, 'violation_archive', violation_archive, ...
+output = struct('optim_archive', optim_archive, 'm_archive', m_archive, 'violation_archive', violation_archive, ...
     'consts', consts, 'lb', lb, 'ub', ub);
 
 end
