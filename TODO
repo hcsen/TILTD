@@ -1,0 +1,13 @@
+Code Clarity
+
+* Use structs for inputs and outpus.
+* Use struct for 'consts' also make readonly.
+
+Error Checking
+
+* Check paths are valid. Complete partial paths.
+
+Inputs
+
+* Make input file JSON.
+* Input verification.
