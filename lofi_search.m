@@ -4,7 +4,7 @@
 % Part of the Tool for Initial Low-Thrust Design (TILTD).
 % Copyright 2022 Darcey Graham
 
-function lofi_search(varargin)
+function [best, lb, ub, violation_archive, optim_archive, consts] = lofi_search(varargin)
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
 
 % Load inputs
@@ -521,14 +521,4 @@ if isMbh
 else
     violation_archive(1) = output.constrviolation;
 end
-%% Save result
-
-% Saves the optimised result, constants, constraint violation, lower and
-% upper bounds. Can replace with anything else you want to save
-% dlmwrite('FILE_NAME_HERE.csv', optimised, 'delimiter', ',', 'precision', 20);
-% dlmwrite('FILE_NAME_HERE_consts.csv', consts, 'delimiter', ',', 'precision', 20);
-dlmwrite('viol.csv', violation_archive, 'delimiter', ',', 'precision', 20); % This is temporary, for purpose of verification.
-% dlmwrite('FILE_NAME_HERE_lb.csv', lb, 'delimiter', ',', 'precision', 20);
-% dlmwrite('FILE_NAME_HERE_ub.csv', ub, 'delimiter', ',', 'precision', 20);
-
 end
