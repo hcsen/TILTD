@@ -4,7 +4,7 @@
 % Part of the Tool for Initial Low-Thrust Design (TILTD).
 % Copyright 2022 Darcey Graham
 
-function [best, lb, ub, violation_archive, optim_archive, consts] = lofi_search(varargin)
+function output = lofi_search(varargin)
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
 
 % Load inputs
@@ -21,8 +21,12 @@ end
 
 % Determine if MBH stage will be run.
 
-isMbh = exist('MBH_noLoops', 'var');
-disp(["MBH: ", isMbh]);
+if ~exist('MBH_noLoops', 'var')
+    % 1 Loop is no MBH
+    MBH_noLoops = 1;
+end
+
+disp(["MBH: ", MBH_noLoops>1]);
 disp(["Parallel: ", use_parallel]);
 disp(["Seed: ", rng_seed]);
 
@@ -274,7 +278,7 @@ if whichFlyby(1) == 1
     x = [x, vinfi_all(:,1).', vinff_all(:,1).'];
     lb = [lb, -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1)];
     ub = [ub vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1)];
-    if isMbh
+    if MBH_noLoops>1
         % Need index of velocity for MBH
         ind_vinfi(:,1) = indNow+1:indNow+3;
         ind_vinff(:,1) = indNow+4:indNow+6;
@@ -418,8 +422,19 @@ else
     end
 end
 
-if isMbh
-    %% MBH setup
+optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
+m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
+violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
+times = zeros(MBH_noLoops, 1);
+
+% Save to archive if the optimised trajectory is feasible
+optim_archive(1,:) = optimised;         % Save all optimised decision variables
+m_archive(1) = m_optim;               % Save final mass from that optimised run
+violation_archive(1) = output.constrviolation;
+best = optimised;
+
+if MBH_noLoops>1
+    best = optim_archive(1,:);    %% MBH setup
 
     % First phase
     if startBody == 1
@@ -479,23 +494,13 @@ if isMbh
         sigmas = [sigmas, s_m, s_u*ones(1,3*N)];
     end
 
-    probSize = length(optimised);
-    
-    optim_archive = zeros(MBH_noLoops, probSize); % For optimised decision variables at each iteration
-    m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
-    violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
-    times = zeros(MBH_noLoops, 1);
-
-    % Save to archive if the optimised trajectory is feasible
-    optim_archive(1,:) = optimised;         % Save all optimised decision variables
-    m_archive(1) = m_optim;               % Save final mass from that optimised run
-    violation_archive(1) = output.constrviolation;
     % times(1) = toc;
 
     % For resolving, know where optimising over dt and where mf
 
-    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
-    best = optim_archive(iMinViolation,:);
+%    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
+    minViolation = violation_archive(1);
+
     %% MBH loop
     if use_parallel
         for k = 2:MBH_noLoops
@@ -518,7 +523,9 @@ if isMbh
             end
         end
     end
-else
-    violation_archive(1) = output.constrviolation;
 end
+
+output = struct('best', best, 'optim_archive', optim_archive, 'm_archive', m_archive, 'violation_archive', violation_archive, ...
+    'consts', consts, 'lb', lb, 'ub', ub);
+
 end
