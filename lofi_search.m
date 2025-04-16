@@ -301,6 +301,7 @@ end
 % Supply index of last final mass, or tell optimiser to optimise the
 % minimum flight time if no thrust arcs
 if whichThrust(1) == 1
+
     indLastMf = sizeX + 1;
     objInd(1) = indLastMf;
     [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
@@ -493,25 +494,30 @@ if isMbh
 
     % For resolving, know where optimising over dt and where mf
 
+    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
+    best = optim_archive(iMinViolation,:);
     %% MBH loop
     if use_parallel
         for k = 2:MBH_noLoops
-            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, optimised, sigmas, MBH_tail, ...
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, best, sigmas, MBH_tail, ...
                 MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
                 phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+            if violation_archive(k) < minViolation
+                best = optim_archive(k, :);
+                minViolation = violation_archive(k);
+            end
         end
     else
         for k = 2:MBH_noLoops
-            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, optimised, sigmas, MBH_tail, ...
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, best, sigmas, MBH_tail, ...
                 MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
                 phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+            if violation_archive(k) < minViolation
+                best = optim_archive(k, :);
+                minViolation = violation_archive(k);
+            end
         end
     end
-    %% Plot best
-
-    min_viol = min(nonzeros(violation_archive));
-    best_index = find(violation_archive==min_viol);
-    best = optim_archive(best_index,:);
 else
     violation_archive(1) = output.constrviolation;
 end
