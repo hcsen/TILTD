@@ -10,4 +10,4 @@
 module load MATLAB/2023b
 
 # Run the MATLAB script MATLAB_job.m 
-matlab -batch "lofi_search Inputs/verification_conf_mbh hpc_conf"
+matlab -batch "example_sbatch"
