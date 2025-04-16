@@ -503,7 +503,7 @@ if MBH_noLoops>1
 
     %% MBH loop
     if use_parallel
-        for k = 2:MBH_noLoops
+        for k = 2:MBH_noLoops-1
             [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, best, sigmas, MBH_tail, ...
                 MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
                 phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
@@ -512,6 +512,11 @@ if MBH_noLoops>1
                 minViolation = violation_archive(k);
             end
         end
+        % Serial run to make sure final run of workers arnt left out.
+        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = basinhop(MBH_noLoops, best, sigmas, MBH_tail, ...
+                MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
+                phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+
     else
         for k = 2:MBH_noLoops
             [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, best, sigmas, MBH_tail, ...
