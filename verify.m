@@ -25,22 +25,28 @@ for i = 1:length(cases)
     else
         variance = sum(referenceResults - testResults) / referenceResults; 
         if OUTPUT_VARIANCE < variance * 100
-            reason = sprintf('Output results not within %u%% of reference case (%u%%).', OUTPUT_VARIANCE, variance*100);
+            reason = sprintf('Output results not within %.3u%% of reference case (%.3u%%).', OUTPUT_VARIANCE, variance*100);
         else
             passOutput = true;
         end
     end
     tReference = (cases{i}{4} * ((RUNTIME_VARIANCE * 0.01)+1) );
     if times(i) > tReference
-        reason = sprintf('Runtime exceeds %u%% of reference case (%us/%us).',  RUNTIME_VARIANCE, times(i), tReference);
-    elseif passOutput
+        reason = sprintf('Runtime exceeds %.2u%% of reference case (%.3fs/%.3us).',  RUNTIME_VARIANCE, times(i), tReference);
+        passOutput = false;
+    end
+    
+    if passOutput
         reason = "Everything looks good";
-        result = "PASS";
+        result = "PASS";       
     end
     fprintf('%s - %s - %s\n', cases{i}{1}, result, reason);
-    failedResults =  results(i);
-    save('failed_output.mat', 'failedResults');
-    fprintf('Wrote failed results to ''failed_output.mat''');
+
+    if ~passOutput
+        failedResults =  results(i);
+        save(['failed_output_', cases{i}{1}, '.mat'], 'failedResults');
+        fprintf(['Wrote failed results to ''failed_output_', cases{i}{1},'.mat''\n']);
+    end
 end 
 
 function [result, time] = testcase(input)
