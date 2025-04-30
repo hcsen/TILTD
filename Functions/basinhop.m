@@ -30,6 +30,9 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
         % beq = broadcast variable
         % Np = broadcast variable
 
+        % Reseed random based on index;
+        baserng = rng();
+        rng(baserng.Seed + k);
 
         % Ensure all variables are local to avoid issues in parfor
         constsCopy = consts; % Avoid broadcast issues. TERRIBLE
@@ -48,7 +51,7 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
 
         % Hop to a new random guess if needed
         if rand < rho_hop
-            disp(k);
+            disp('Random hop');
             perturbed(1) = perturbed(1) + 2 * t0Hop * rand - t0Hop; % Hop the launch epoch
             for j = 1:Np
                 perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2 * dtHop * rand - dtHop; % Hop each phase tof
@@ -91,18 +94,20 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
 
         % Re-optimize phases
         for i = 1:Np
+            fprintf("MBH Hop (%u).... Phase(%u/%u)\n",k, i, Np);
+
             constsCopy(7) = i;
             x = perturbed(1:phaseSizes(i));
             lbCurrent = lb(1:phaseSizes(i));
             ubCurrent = ub(1:phaseSizes(i));
 
-            if any(i <= whichThrust)
+            if any(i == whichThrust)
                 [optimised, ~, ~, output] = fmincon(@(x)obj_lofiSF(x, objInd(i)), x, A, b, Aeq, beq, lbCurrent, ubCurrent, @(x)con_lofiSF(x, constsCopy), options);
             else
                 [optimised, ~, ~, output] = fmincon(@(x)obj_lofiSF_coast(x, objInd(i)), x, A, b, Aeq, beq, lbCurrent, ubCurrent, @(x)con_lofiSF(x, constsCopy), options);
             end
             perturbed(1:phaseSizes(i)) = optimised;
         end
-        
+        fprintf("MBH Hop (%u).... Done\n",k);
         constrviolation = output.constrviolation;
     end
