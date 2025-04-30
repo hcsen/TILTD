@@ -7,6 +7,13 @@
 function output = lofi_search(varargin)
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
 
+
+% Set some default values before loading inputs.
+MBH_noLoops = 1;
+rng_seed = 1;
+use_parallel = false;   
+displayFmincon = 'none';
+
 % Load inputs
 for i = 1:length(varargin)
     inputPath = strsplit(varargin{i},{'/','\'});
@@ -19,14 +26,7 @@ for i = 1:length(varargin)
     eval(fileName{:});
 end
 
-% Determine if MBH stage will be run.
-
-if ~exist('MBH_noLoops', 'var')
-    % 1 Loop is no MBH
-    MBH_noLoops = 1;
-end
-
-disp(["MBH: ", MBH_noLoops>1]);
+disp(["MBH: ", MBH_noLoops]);
 disp(["Parallel: ", use_parallel]);
 disp(["Seed: ", rng_seed]);
 
@@ -55,7 +55,6 @@ if use_parallel
 end
 
 rng(rng_seed);
-
 
 % Keep track of some indices for MBH
 ind_vinfi = zeros(3, N_flybys);
@@ -228,13 +227,12 @@ h_mins = h_mins/DU;
 h_maxs = h_maxs/DU;
 
 %% Optimise phase by phase
-
 A = [];               % A.x <= b
 b = [];
 Aeq = [];           % Aeq.x = beq
 beq = [];
 options = optimoptions('fmincon','Algorithm','sqp','ConstraintTolerance', NLP_feas_tol, 'OptimalityTolerance', ...
-    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display','iter', 'UseParallel', use_parallel);
+    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display', displayFmincon, 'UseParallel', use_parallel);
 
 NpCurrent = 1;
 
@@ -249,6 +247,8 @@ lb_store = zeros(Np, noDecision);
 ub_store = zeros(Np, noDecision);
 objInd = zeros(1,Np);
 phaseSizes = zeros(1,Np);
+
+fprintf("Initial Optimisation.... Phase(%u/%u)\n", 1, Np);
 
 % First phase if starts on SOI
 if startBody == 1
@@ -320,6 +320,8 @@ end
 
 NpCurrent = 2;
 for i = 2:Np-1
+    fprintf("Initial Optimisation.... Phase(%u/%u)\n", i, Np);
+
     sizeOptim = length(x);  % THIS DIFFERS FROM MBH 'sizeOptim = length(optimised);'
     consts(7) = NpCurrent;
     x = [optimised, dt_all(i)];
@@ -371,6 +373,7 @@ end
 
 %% Final phase
 
+fprintf("Initial Optimisation.... Phase(%u/%u)\n", Np, Np);
 consts(7) = Np;
 
 sizeOptim = length(x);
@@ -422,6 +425,8 @@ else
     end
 end
 
+fprintf("Initial Optimisation.... Done\n");
+
 optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
 m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
 violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
@@ -434,6 +439,7 @@ violation_archive(1) = output.constrviolation;
 best = optimised;
 
 if MBH_noLoops>1
+    disp('Starting Monotonic Basin Hopping');
     best = optim_archive(1,:);    %% MBH setup
 
     % First phase
@@ -500,31 +506,47 @@ if MBH_noLoops>1
 
 %    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
     minViolation = violation_archive(1);
+    
+    % Define partial function to simplify loop.
+
+    f = @(k, best)basinhop(k, best, sigmas, MBH_tail, MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
 
     %% MBH loop
     if use_parallel
-        for k = 2:MBH_noLoops-1
-            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, best, sigmas, MBH_tail, ...
-                MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
-                phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+        % Delete lockfile if exists.
+        jobStorageLocation = pc.JobStorageLocation;
+
+        if exist(fullfile(jobStorageLocation,'.lock'), 'file')==2
+            delete(fullfile(jobStorageLocation, '.lock'));
+        end
+        asyncsave(jobStorageLocation, 'best.mat', struct('best', best, 'minViolation', minViolation));
+        parfor k = 2:MBH_noLoops-1
+            path
+            pwd
+
+            s = load(fullfile(jobStorageLocation, 'best.mat'), 'minViolation', 'best');
+            best = s.best;
+            minViolation = s.minViolation;
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+            
             if violation_archive(k) < minViolation
-                best = optim_archive(k, :);
-                minViolation = violation_archive(k);
+                asyncsave(jobStorageLocation, 'best.mat', struct('best', optim_archive(k, :), 'minViolation', violation_archive(k)));
+                fprintf("New best value found, %s vs %s\n", violation_archive(k), minViolation);
+            else
+                fprintf("Best value unchanged, %s vs %s\n", violation_archive(k), minViolation);
             end
         end
         % Serial run to make sure final run of workers arnt left out.
-        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = basinhop(MBH_noLoops, best, sigmas, MBH_tail, ...
-                MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
-                phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
-
+        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = f(MBH_noLoops, best);
     else
         for k = 2:MBH_noLoops
-            [optim_archive(k, :), m_archive(k), violation_archive(k)] = basinhop(k, best, sigmas, MBH_tail, ...
-                MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
-                phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
             if violation_archive(k) < minViolation
+                fprintf("New best value found, %s vs %s\n", violation_archive(k), minViolation);
                 best = optim_archive(k, :);
                 minViolation = violation_archive(k);
+            else
+                fprintf("Best value unchanged, %s vs %s\n", violation_archive(k), minViolation);
             end
         end
     end
