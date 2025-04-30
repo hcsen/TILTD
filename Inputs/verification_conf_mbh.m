@@ -24,6 +24,7 @@ N = 20;                              % Number of segments per trajectory phase
 
 N_ephem = 1000;                      % Number of points over which to get ephemeris data
 N_thrust = 2;                        % Number of thrust arcs
+% is N_thrust = len(whichThrust) ?
 whichThrust = [1,2];                 % List of which phases have thrust
 
 % Spacecraft info

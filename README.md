@@ -69,6 +69,22 @@ There shouldn't ever be issues with this command. Seek help if there are.
 
 If there are no files in your working directory that you don't want recorded (and arn't listed in `.gitignore`) you can use `!git add --all` instead of listing files.
 
+## Using SLURM
+
+The file `submit.sh` is a Slurm Script, a bash script with additional meta-parameters required for submission to the NeSI job scheduler.
+Number of cpus, runtime and memory can all be set in the header of the script.
+
+### Commands
+
+|           |                       |                                                                          |
+| --------- | --------------------- | ------------------------------------------------------------------------ |
+| `sbatch`  | `sbatch submit.sl`    | Submits the Slurm script `submit.sl`                                      |
+| `sacct`   | `sacct`               | Displays all the jobs run by you that day.                               |
+|           | `sacct -S YYYY-MM-DD` | Displays all the jobs run by you since given date.                 |
+| `scancel` | `scancel 123456789`   | Cancels job *123456789*                                                   |
+
+Whatever output would normally be printed to stdout will instead be written to an output file, the name of the output file can be set in your Slurm script, but by default it will be `slurm-<jobid>.out`
+
 ## Kernels
 
 Note, paths in meta kernel files are relative to current working directory, not kernel file. 

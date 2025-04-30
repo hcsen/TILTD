@@ -4,10 +4,15 @@
 % Part of the Tool for Initial Low-Thrust Design (TILTD).
 % Copyright 2022 Darcey Graham
 
-
-function lofi_search(varargin)
-tic
+function output = lofi_search(varargin)
 assert( ~isempty(varargin), 'Not enough input arguments. Please specify an input file');
+
+
+% Set some default values before loading inputs.
+MBH_noLoops = 1;
+rng_seed = 1;
+use_parallel = false;   
+displayFmincon = 'none';
 
 % Load inputs
 for i = 1:length(varargin)
@@ -21,16 +26,15 @@ for i = 1:length(varargin)
     eval(fileName{:});
 end
 
-% Determine if MBH stage will be run.
-
-isMbh = exist('MBH_noLoops', 'var');
-disp(["MBH: ", isMbh]);
+disp(["MBH: ", MBH_noLoops]);
 disp(["Parallel: ", use_parallel]);
 disp(["Seed: ", rng_seed]);
 
+rootDir = pwd;
+
 % User: add paths to your MICE library for SPICE
 % 'fullfile' allows contructing paths OS independently.
-addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'));
+addpath('Functions', fullfile(mice_path{:}, 'src', 'mice'), fullfile(mice_path{:}, 'lib'), rootDir);
 
 % Load the generic kernel(s) for ephemeris data
 cspice_furnsh( { fullfile(kernel_path{:} ) } );
@@ -38,7 +42,7 @@ cspice_furnsh( { fullfile(kernel_path{:} ) } );
 if use_parallel
     pc = parcluster('local'); % Get cluster settings for local run.
     tmpdir = getenv('TMPDIR');
-    num_cpus = str2num(getenv('SLURM_CPUS_PER_TASK'));
+    num_cpus = str2num(getenv('SLURM_CPUS_PER_TASK'))/2;
     if isfolder(tmpdir)
         pc.JobStorageLocation = tmpdir; % Set to use system TMPDIR (faster run).
     end
@@ -47,11 +51,10 @@ if use_parallel
         parpool(pc, num_cpus)
     else
         parpool(pc);
-    end
+    end    
 end
 
 rng(rng_seed);
-
 
 % Keep track of some indices for MBH
 ind_vinfi = zeros(3, N_flybys);
@@ -169,21 +172,17 @@ for i = 1 : Np-1
 end
 
 % For flyby phases
-if N_flybys > 0
-    for i = 1 : N_flybys
-        vinfi_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
-        vinff_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
-    end
+for i = 1 : N_flybys
+    vinfi_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
+    vinff_all(:,i) = [vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1); vinf_bound(i)*(2*rand - 1)];
 end
 
 % For non-flyby phases
-if N_flybys < Np - 1
-    for i = 1 : (Np-1-N_flybys)
-        r_free(:,i) = [(x_free_max - x_free_min)*rand + x_free_min; (y_free_max - y_free_min)*rand + y_free_min; ...
-            (z_free_max - z_free_min)*rand + z_free_min];
-        v_free(:,i) = [(vx_free_max - vx_free_min)*rand + vx_free_min; (vy_free_max - vy_free_min)*rand + vy_free_min; ...
-            (vz_free_max - vz_free_min)*rand + vz_free_min];
-    end
+for i = 1 : (Np-1-N_flybys)
+    r_free(:,i) = [(x_free_max - x_free_min)*rand + x_free_min; (y_free_max - y_free_min)*rand + y_free_min; ...
+        (z_free_max - z_free_min)*rand + z_free_min];
+    v_free(:,i) = [(vx_free_max - vx_free_min)*rand + vx_free_min; (vy_free_max - vy_free_min)*rand + vy_free_min; ...
+        (vz_free_max - vz_free_min)*rand + vz_free_min];
 end
 
 % Thrust arcs
@@ -194,6 +193,7 @@ end
 
 % Stuff that all phases have
 dt_all(Np) = (dt_max(N_thrust) - dt_min(N_thrust))*rand + dt_min(N_thrust); % THIS DIFFERS IN MBH 'dt_all(Np) = (dt_max(i) - dt_min(i))*rand + dt_min(i);'
+% dt_all(Np) = (dt_max(Np) - dt_min(N_thrust))*rand + dt_min(N_thrust); % THIS DIFFERS IN MBH 'dt_all(Np) = (dt_max(i) - dt_min(i))*rand + dt_min(i);'
 
 %% Convert units
 
@@ -227,13 +227,12 @@ h_mins = h_mins/DU;
 h_maxs = h_maxs/DU;
 
 %% Optimise phase by phase
-
 A = [];               % A.x <= b
 b = [];
 Aeq = [];           % Aeq.x = beq
 beq = [];
 options = optimoptions('fmincon','Algorithm','sqp','ConstraintTolerance', NLP_feas_tol, 'OptimalityTolerance', ...
-    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display','iter', 'UseParallel', use_parallel);
+    NLP_tol, 'StepTolerance', NLP_steptol, 'MaxFunctionEvaluations', NLP_iter_max,'Display', displayFmincon, 'UseParallel', use_parallel);
 
 NpCurrent = 1;
 
@@ -248,6 +247,8 @@ lb_store = zeros(Np, noDecision);
 ub_store = zeros(Np, noDecision);
 objInd = zeros(1,Np);
 phaseSizes = zeros(1,Np);
+
+fprintf("Initial Optimisation.... Phase(%u/%u)\n", 1, Np);
 
 % First phase if starts on SOI
 if startBody == 1
@@ -277,7 +278,7 @@ if whichFlyby(1) == 1
     x = [x, vinfi_all(:,1).', vinff_all(:,1).'];
     lb = [lb, -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1), -vinf_bound(1)];
     ub = [ub vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1), vinf_bound(1)];
-    if isMbh
+    if MBH_noLoops>1
         % Need index of velocity for MBH
         ind_vinfi(:,1) = indNow+1:indNow+3;
         ind_vinff(:,1) = indNow+4:indNow+6;
@@ -304,6 +305,7 @@ end
 % Supply index of last final mass, or tell optimiser to optimise the
 % minimum flight time if no thrust arcs
 if whichThrust(1) == 1
+
     indLastMf = sizeX + 1;
     objInd(1) = indLastMf;
     [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
@@ -317,61 +319,61 @@ end
 %% Intermediate phases
 
 NpCurrent = 2;
+for i = 2:Np-1
+    fprintf("Initial Optimisation.... Phase(%u/%u)\n", i, Np);
 
-if Np > 2
-    for i = 2:Np-1
-        sizeOptim = length(x);  % THIS DIFFERS FROM MBH 'sizeOptim = length(optimised);'
-        consts(7) = NpCurrent;
-        x = [optimised, dt_all(i)];
-        lb = [lb, dt_min(i)];
-        ub = [ub, dt_max(i)];
-        indLastDt = sizeOptim+1;
-        dtIndex(i) = indLastDt;
-        % If this phase ends in a flyby
-        if any(i == whichFlyby)
-            x = [x, vinfi_all(:,i).', vinff_all(:,i).'];
-            lb = [lb, -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i)];
-            ub = [ub, vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i)];
+    sizeOptim = length(x);
+    consts(7) = NpCurrent;
+    x = [optimised, dt_all(i)];
+    lb = [lb, dt_min(i)];
+    ub = [ub, dt_max(i)];
+    indLastDt = sizeOptim+1;
+    dtIndex(i) = indLastDt;
+    % If this phase ends in a flyby
+    if any(i == whichFlyby)
+        x = [x, vinfi_all(:,i).', vinff_all(:,i).'];
+        lb = [lb, -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i), -vinf_bound(i)];
+        ub = [ub, vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i), vinf_bound(i)];
 
-        % Else, this phase ends at a point in free space
-        else
-            x = [x, r_free(:,i).', v_free(:,i).'];
-            lb = [lb, x_free_min(i), y_free_min(i), z_free_min(i), vx_free_min(i), vy_free_min(i), vz_free_min(i)];
-            ub = [ub, x_free_max(i), y_free_max(i), z_free_max(i), vx_free_max(i), vy_free_max(i), vz_free_max(i)];
-        end
+    % Else, this phase ends at a point in free space
+    else
+        x = [x, r_free(:,i).', v_free(:,i).'];
+        lb = [lb, x_free_min(i), y_free_min(i), z_free_min(i), vx_free_min(i), vy_free_min(i), vz_free_min(i)];
+        ub = [ub, x_free_max(i), y_free_max(i), z_free_max(i), vx_free_max(i), vy_free_max(i), vz_free_max(i)];
+    end
 
-        % If phase is a thrust arc
-        if any(i==whichThrust)
-            x = [x, mf_all(thrustInd), u_all(1+(thrustInd-1)*3,:), u_all(2+(thrustInd-1)*3,:), u_all(3+(thrustInd-1)*3,:)];
-            lb = [lb, mf_min(thrustInd), u_min(1+(thrustInd-1)*3,:), u_min(2+(thrustInd-1)*3,:), u_min(3+(thrustInd-1)*3,:)];
-            ub = [ub, mf_max(thrustInd), u_max(1+(thrustInd-1)*3,:), u_max(2+(thrustInd-1)*3,:), u_max(3+(thrustInd-1)*3,:)];
-            thrustInd = thrustInd+1;
-            
-            indLastMf = sizeOptim + 8;
+    % If phase is a thrust arc
+    if any(i==whichThrust)
+        x = [x, mf_all(thrustInd), u_all(1+(thrustInd-1)*3,:), u_all(2+(thrustInd-1)*3,:), u_all(3+(thrustInd-1)*3,:)];
+        lb = [lb, mf_min(thrustInd), u_min(1+(thrustInd-1)*3,:), u_min(2+(thrustInd-1)*3,:), u_min(3+(thrustInd-1)*3,:)];
+        ub = [ub, mf_max(thrustInd), u_max(1+(thrustInd-1)*3,:), u_max(2+(thrustInd-1)*3,:), u_max(3+(thrustInd-1)*3,:)];
+        thrustInd = thrustInd+1;
+        
+        indLastMf = sizeOptim + 8;
+        objInd(i) = indLastMf;
+        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+        phaseSizes(i) = length(optimised);
+    else
+        % If there has been a thrust arc in the past, optimise for its
+        % final mass
+        if any(i <= whichThrust)
             objInd(i) = indLastMf;
             [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
             phaseSizes(i) = length(optimised);
         else
-            % If there has been a thrust arc in the past, optimise for its
-            % final mass
-            if any(i <= whichThrust)
-                objInd(i) = indLastMf;
-                [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-                phaseSizes(i) = length(optimised);
-            else
-                indLast = sizeOptim + 1;
-                objInd(i) = indLastDt;
-                [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-                phaseSizes(i) = length(optimised);
-            end
+            indLast = sizeOptim + 1;
+            objInd(i) = indLastDt;
+            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,indLastDt),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+            phaseSizes(i) = length(optimised);
         end
-        
-        NpCurrent = NpCurrent+1;
     end
+    
+    NpCurrent = NpCurrent+1;
 end
 
 %% Final phase
 
+fprintf("Initial Optimisation.... Phase(%u/%u)\n", Np, Np);
 consts(7) = Np;
 
 sizeOptim = length(x);
@@ -423,8 +425,22 @@ else
     end
 end
 
-if isMbh
-    %% MBH setup
+fprintf("Initial Optimisation.... Done\n");
+
+optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
+m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
+violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
+times = zeros(MBH_noLoops, 1);
+
+% Save to archive if the optimised trajectory is feasible
+optim_archive(1,:) = optimised;         % Save all optimised decision variables
+m_archive(1) = m_optim;               % Save final mass from that optimised run
+violation_archive(1) = output.constrviolation;
+best = optimised;
+
+if MBH_noLoops>1
+    disp('Starting Monotonic Basin Hopping');
+    best = optim_archive(1,:);    %% MBH setup
 
     % First phase
     if startBody == 1
@@ -451,21 +467,19 @@ if isMbh
     end
 
     % Intermediate phases
-    if Np > 2
-        for i = 2:Np-1
-            sigmas = [sigmas, s_dt];
-            
-            % If ends in flyby
-            if any(i == whichFlyby)
-                sigmas = [sigmas, s_v,s_v,s_v, s_v,s_v,s_v];
-            else
-                sigmas = [sigmas, s_r, s_r, s_r, s_v, s_v, s_v];
-            end
+    for i = 2:Np-1
+        sigmas = [sigmas, s_dt];
+        
+        % If ends in flyby
+        if any(i == whichFlyby)
+            sigmas = [sigmas, s_v,s_v,s_v, s_v,s_v,s_v];
+        else
+            sigmas = [sigmas, s_r, s_r, s_r, s_v, s_v, s_v];
+        end
 
-            % If phase is a thrust arc
-            if any(i==whichThrust)
-                sigmas = [sigmas, s_m, s_u*ones(1,N*3)];
-            end
+        % If phase is a thrust arc
+        if any(i==whichThrust)
+            sigmas = [sigmas, s_m, s_u*ones(1,N*3)];
         end
     end
 
@@ -486,168 +500,62 @@ if isMbh
         sigmas = [sigmas, s_m, s_u*ones(1,3*N)];
     end
 
-    probSize = length(optimised);
-    
-    optim_archive = zeros(MBH_noLoops, probSize); % For optimised decision variables at each iteration
-    m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
-    violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
-    times = zeros(MBH_noLoops, 1);
-
-    % Save to archive if the optimised trajectory is feasible
-    optim_archive(1,:) = optimised;         % Save all optimised decision variables
-    m_archive(1) = m_optim;               % Save final mass from that optimised run
-    violation_archive(1) = output.constrviolation;
     % times(1) = toc;
 
     % For resolving, know where optimising over dt and where mf
 
+%    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
+    minViolation = violation_archive(1);
+    
+    % Disable fmincon parallelisation here to avoid nesting parpool.
+    options.UseParallel=false;
+
+    % Define partial function to simplify loop.
+    f = @(k, best)basinhop(k, best, sigmas, MBH_tail, MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+
     %% MBH loop
+    if use_parallel
+        % Delete lockfile if exists.
+        jobStorageLocation = pc.JobStorageLocation;
 
-    for k = 2:MBH_noLoops
-        
-        % Perturb all the decision variables in the already-optimised
-        % trajectory. Multiply by either 1 or -1 because Pareto distribution
-        % doesn't allow negative values, which we want
-        pm = fix(rand(1,probSize)+0.5);
-        pm(~pm) = -1;
-        perturbed = optimised + gprnd(MBH_tail, sigmas, MBH_theta*ones(1,probSize)).*pm;
-
-        % Or, come up with an entirely new random guess
-        if rand < rho_hop           % If a random number is below a value, hop
-            disp(k)
+        if exist(fullfile(jobStorageLocation,'.lock'), 'file')==2
+            delete(fullfile(jobStorageLocation, '.lock'));
+        end
+        asyncsave(jobStorageLocation, 'best.mat', struct('best', best, 'minViolation', minViolation));
+        parfor k = 2:MBH_noLoops-1
+            s = load(fullfile(jobStorageLocation, 'best.mat'), 'best');
+            best = s.best;
             
-            % Hop the launch epoch
-            perturbed(1) = perturbed(1) + 2*t0Hop*rand - t0Hop;
-            
-            % Hop each phase tof
-            for j = 1:Np
-                perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2*dtHop*rand - dtHop;
-            end
-        end                 % End hop to new point
-        
-        % If any decision variables have gone outside the bounds, set them to
-        % be equal to the lower or upper bound
-        for j = 1:probSize
-            if perturbed(j) < lb(j)
-                perturbed(j) = lb(j);
-                % Make sure the elements of vinfi ~= vinff or will crash optimisation
-                if N_flybys > 0
-                    for vind = 1:N_flybys
-                        if norm(perturbed(ind_vinfi((1:3)+(vind-1)*3))) == norm(perturbed(ind_vinff((1:3)+(vind-1)*3)))
-                        % Adjust vinfi accordingly, making it larger if it's on
-                        % the lower bound, smaller if on upper bound
-                            for f = 1:3
-                                if perturbed(ind_vinfi(f + (vind-1)*3)) < 0
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) + s_v*rand;
-                                else
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) - s_v*rand;
-                                end
-                            end                    
-                        end
-                    end
-                end
-            elseif perturbed(j) > ub(j)
-                perturbed(j) = ub(j);
-                % Make sure the elements of vinfi ~= vinff or will crash optimisation
-                if N_flybys > 0
-                    for vind = 1:N_flybys
-                        if norm(perturbed(ind_vinfi((1:3)+(vind-1)*3))) == norm(perturbed(ind_vinff((1:3)+(vind-1)*3)))
-                        % Adjust vinfi accordingly, making it larger if it's on
-                        % the lower bound, smaller if on upper bound
-                            for f = 1:3
-                                if perturbed(ind_vinfi(f + (vind-1)*3)) < 0
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) + s_v*rand;
-                                else
-                                    perturbed(ind_vinfi(f+(vind-1)*3)) = perturbed(ind_vinfi(f+(vind-1)*3)) - s_v*rand;
-                                end
-                            end      
-                        end
-                    end
-                end
-            end
-        end
-        
-        % Re-optimise first phase
-        consts(7) = 1;
-        if whichThrust(1) == 1
-            lbCurrent = lb(1:phaseSizes(1));
-            ubCurrent = ub(1:phaseSizes(1));
-            x = perturbed(1:phaseSizes(1));
-            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(1)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-            perturbed(1:phaseSizes(1)) = optimised;
-        else
-            lbCurrent = lb(1:phaseSizes(1));
-            ubCurrent = ub(1:phaseSizes(1));
-            x = perturbed(1:phaseSizes(1));
-            [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(1)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-            perturbed(1:phaseSizes(1)) = optimised;
-        end
-        
-        % Re-optimise intermediate phases
-        NpCurrent = 2;
-        if Np > 2
-            for i = 2:Np-1
-                consts(7) = NpCurrent;
-                x = perturbed(1:phaseSizes(i));
-                lbCurrent = lb(1:phaseSizes(i));
-                ubCurrent = ub(1:phaseSizes(i));
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+    
+            % Re-check file, incase has been updated since. 
+            s = load(fullfile(jobStorageLocation, 'best.mat'), 'minViolation');
+            minViolation = s.minViolation;
 
-                % If phase is a thrust arc
-                if any(i==whichThrust)
-                    [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-                else
-                    % If there has been a thrust arc in the past, optimise for its
-                    % final mass
-                    if any(i <= whichThrust)
-                        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-                    else
-                        [optimised,~,~,output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(i)),x,A,b,Aeq,beq,lbCurrent,ubCurrent, @(x)con_lofiSF(x,consts), options);
-                    end
-                end
-                
-                perturbed(1:phaseSizes(i)) = optimised;
-                NpCurrent = NpCurrent+1;
-            end
-        end
-        
-        % Re-optimise final phase
-        consts(7) = Np;
-        x = perturbed;
-        if whichThrust(end) == Np
-            [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
-        else
-            % If there has been a thrust arc in the past, optimise for its
-            % final mass
-            if N_thrust ~= 0
-                [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+            if violation_archive(k) < minViolation
+                asyncsave(jobStorageLocation, 'best.mat', struct('best', optim_archive(k, :), 'minViolation', violation_archive(k)));
+                fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
             else
-                [optimised, m_optim, exitflag, output] = fmincon(@(x)obj_lofiSF_coast(x,objInd(Np)),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
+                fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
             end
         end
-        
-        % Save to archive
-        optim_archive(k,:) = optimised;
-        m_archive(k) = m_optim;
-        violation_archive(k) = output.constrviolation;
-    end 
-
-    %% Plot best
-
-    min_viol = min(nonzeros(violation_archive));
-    best_index = find(violation_archive==min_viol);
-    best = optim_archive(best_index,:);
-else
-    violation_archive(1) = output.constrviolation;
+        % Serial run to make sure final run of workers arnt left out.
+        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = f(MBH_noLoops, best);
+    else
+        for k = 2:MBH_noLoops
+            [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+            if violation_archive(k) < minViolation
+                fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+                best = optim_archive(k, :);
+                minViolation = violation_archive(k);
+            else
+                fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+            end
+        end
+    end
 end
-%% Save result
 
-% Saves the optimised result, constants, constraint violation, lower and
-% upper bounds. Can replace with anything else you want to save
-% dlmwrite('FILE_NAME_HERE.csv', optimised, 'delimiter', ',', 'precision', 20);
-% dlmwrite('FILE_NAME_HERE_consts.csv', consts, 'delimiter', ',', 'precision', 20);
-dlmwrite('viol.csv', violation_archive, 'delimiter', ',', 'precision', 20); % This is temporary, for purpose of verification.
-% dlmwrite('FILE_NAME_HERE_lb.csv', lb, 'delimiter', ',', 'precision', 20);
-% dlmwrite('FILE_NAME_HERE_ub.csv', ub, 'delimiter', ',', 'precision', 20);
-
+output = struct('optim_archive', optim_archive, 'm_archive', m_archive, 'violation_archive', violation_archive, ...
+    'consts', consts, 'lb', lb, 'ub', ub);
 
 end
