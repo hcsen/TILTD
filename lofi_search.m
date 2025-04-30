@@ -42,7 +42,7 @@ cspice_furnsh( { fullfile(kernel_path{:} ) } );
 if use_parallel
     pc = parcluster('local'); % Get cluster settings for local run.
     tmpdir = getenv('TMPDIR');
-    num_cpus = str2num(getenv('SLURM_CPUS_PER_TASK'));
+    num_cpus = str2num(getenv('SLURM_CPUS_PER_TASK'))/2;
     if isfolder(tmpdir)
         pc.JobStorageLocation = tmpdir; % Set to use system TMPDIR (faster run).
     end
