@@ -46,8 +46,8 @@ if use_parallel
     if isfolder(tmpdir)
         pc.JobStorageLocation = tmpdir; % Set to use system TMPDIR (faster run).
     end
-    if isinteger(num_cpus) % If inside slurm script, use SLURM_CPUS_PER_TASK.
-                       % Otherwise matlab decides.
+    
+    if isnumeric(num_cpus) % If inside slurm script, use SLURM_CPUS_PER_TASK.
         parpool(pc, num_cpus)
     else
         parpool(pc);
