@@ -144,15 +144,6 @@ dt_max = [7,3,5]*86400/TU;          % Maximum time of flight in TU
 mf_min = [12.5,12.5,12.5]/MU;                % Minimum final mass in MU
 mf_max = [14,14,14]/MU;                % Maximum final mass in MU
 
-% Control vector. Need one in the x,y,z directions for each impulse in each
-% phase that permits thrust. Shouldn't need to use anything besides bounds
-% of -1 and 1.
-u_min = (-1)*ones(N_thrust*3, N);
-u_max = ones(N_thrust*3, N);
-
-%% User Inputs - MBH parameters
-% Not usually much need to change the defaults
-
 t0Hop = 9*86400/TU;                % Max amount to hop launch epoch in TU
 dtHop = 0.2*86400/TU;                 % Max amount to hop time of flights in TU
 MBH_noLoops = 100;                  % Number of times to run
