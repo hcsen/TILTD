@@ -23,7 +23,7 @@ endBody = 3;
 N = 20;                              % Number of segments per trajectory phase
 
 N_ephem = 1000;                      % Number of points over which to get ephemeris data
-N_thrust = 2;                        % Number of thrust arcs
+N_thrust = 3;                        % Number of thrust arcs
 % is N_thrust = len(whichThrust) ?
 whichThrust = [1,2,3];                 % List of which phases have thrust
 
@@ -81,8 +81,8 @@ VU = DU/TU;                          % Velocity unit in km/s
 % phase.
 % For final phase: vinfi but no vinff because not doing a GA
 
-h_mins = [50];                     % Minimum height above flyby body in km
-h_maxs = [1000];                   % Maximum height above flyby body in km
+h_mins = [50, 50];                     % Minimum height above flyby body in km
+h_maxs = [1000, 1000];                   % Maximum height above flyby body in km
 
 t_ephem_min = 'January 1 2035';      % Time to start fetching planetary ephemeris data, must be string of form Month d yyyy
 t_ephem_max = 'June 1 2035';      % End of time ephemeris data taken over
