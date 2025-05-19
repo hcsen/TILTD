@@ -248,7 +248,8 @@ ub_store = zeros(Np, noDecision);
 objInd = zeros(1,Np);
 phaseSizes = zeros(1,Np);
 
-fprintf("Initial Optimisation.... Phase(%u/%u)\n", 1, Np);
+fprintf("Starting Initial Optimisation\n");
+fprintf("Initial (1).... Phase(%u / %u)\n", 1, Np);
 
 % First phase if starts on SOI
 if startBody == 1
@@ -373,7 +374,7 @@ end
 
 %% Final phase
 
-fprintf("Initial Optimisation.... Phase(%u/%u)\n", Np, Np);
+fprintf("Initial (1).... Phase(%u / %u)\n", Np, Np);
 consts(7) = Np;
 
 sizeOptim = length(x);
@@ -425,7 +426,7 @@ else
     end
 end
 
-fprintf("Initial Optimisation.... Done\n");
+fprintf("Initial (1).... Done\n");
 
 optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
 m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
