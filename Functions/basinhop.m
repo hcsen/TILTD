@@ -47,54 +47,42 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
         pm(~pm) = -1;
 
         % TODO: This doesn't need to be done twice.
-        perturbed = best + gprnd(MBH_tail, sigmas, MBH_theta * ones(1, probSize)) .* pm;
+        perturbed = best + gprnd(MBH_tail, sigmas, MBH_theta .* pm);
 
         % Hop to a new random guess if needed
         if rand < rho_hop
-            disp('Random hop');
+            disp('Random hop (%%%f)\n', 100/rho_hop);
+            % What is this doing.
             perturbed(1) = perturbed(1) + 2 * t0Hop * rand - t0Hop; % Hop the launch epoch
             for j = 1:Np
                 perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2 * dtHop * rand - dtHop; % Hop each phase tof
             end
         end
 
+        outsideboundcount = 0;
+
         % Ensure decision variables are within bounds
         % TODO: Must be better way to do this!
         for j = 1:probSize
             if perturbed(j) < lb(j)
+                %fprintf('Perturbed Value Outside Bounds! %.4e < %.4e\n', perturbed(j),  lb(j));
+                outsideboundcount = outsideboundcount + 1;
                 perturbed(j) = lb(j);
-                % Adjust vinfi if it equals vinff
-                for vind = 1:N_flybys
-                    if norm(perturbed(ind_vinfi((1:3) + (vind - 1) * 3))) == norm(perturbed(ind_vinff((1:3) + (vind - 1) * 3)))
-                        for f = 1:3
-                            if perturbed(ind_vinfi(f + (vind - 1) * 3)) < 0
-                                perturbed(ind_vinfi(f + (vind - 1) * 3)) = perturbed(ind_vinfi(f + (vind - 1) * 3)) + s_v * rand;
-                            else
-                                perturbed(ind_vinfi(f + (vind - 1) * 3)) = perturbed(ind_vinfi(f + (vind - 1) * 3)) - s_v * rand;
-                            end
-                        end
-                    end
-                end
             elseif perturbed(j) > ub(j)
+                %fprintf('Perturbed Value Outside Bounds! %.4e > %.4e\n', perturbed(j),  ub(j));
+                outsideboundcount = outsideboundcount + 1;
                 perturbed(j) = ub(j);
-                % Adjust vinfi if it equals vinff
-                for vind = 1:N_flybys
-                    if norm(perturbed(ind_vinfi((1:3) + (vind - 1) * 3))) == norm(perturbed(ind_vinff((1:3) + (vind - 1) * 3)))
-                        for f = 1:3
-                            if perturbed(ind_vinfi(f + (vind - 1) * 3)) < 0
-                                perturbed(ind_vinfi(f + (vind - 1) * 3)) = perturbed(ind_vinfi(f + (vind - 1) * 3)) + s_v * rand;
-                            else
-                                perturbed(ind_vinfi(f + (vind - 1) * 3)) = perturbed(ind_vinfi(f + (vind - 1) * 3)) - s_v * rand;
-                            end
-                        end
-                    end
-                end
             end
         end
+        
+        if outsideboundcount > 0
+            fprintf('(%u / %u) perturbed values fell outside of bounds and were corrected.\n', outsideboundcount,  probSize);
+        end
+
 
         % Re-optimize phases
         for i = 1:Np
-            fprintf("MBH Hop (%u).... Phase(%u/%u)\n",k, i, Np);
+            fprintf("MBH Hop (%u).... Phase(%u / %u)\n",k, i, Np);
 
             constsCopy(7) = i;
             x = perturbed(1:phaseSizes(i));
