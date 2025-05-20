@@ -79,7 +79,6 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
             fprintf('(%u / %u) perturbed values fell outside of bounds and were corrected.\n', outsideboundcount,  probSize);
         end
 
-
         % Re-optimize phases
         for i = 1:Np
             fprintf("MBH Hop (%u).... Phase(%u / %u)\n",k, i, Np);
