@@ -320,7 +320,7 @@ end
 
 NpCurrent = 2;
 for i = 2:Np-1
-    fprintf("Initial.... Phase(%u/%u)\n", i, Np);
+    fprintf("Initial (1).... Phase(%u / %u)\n", i, Np);
 
     sizeOptim = length(x);
     consts(7) = NpCurrent;
@@ -504,7 +504,6 @@ if MBH_noLoops>1
 
     % For resolving, know where optimising over dt and where mf
 
-%    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
     minViolation = violation_archive(1);
     
     % Disable fmincon parallelisation here to avoid nesting parpool.

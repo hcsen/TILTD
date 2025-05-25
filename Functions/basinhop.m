@@ -47,7 +47,8 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
         pm(~pm) = -1;
 
         % TODO: This doesn't need to be done twice.
-        perturbed = best + gprnd(MBH_tail, sigmas, MBH_theta .* pm);
+        % Also, don't know why scale factor is sigmas?
+        perturbed = best + gprnd(MBH_tail, sigmas, 0) .* pm;
 
         % Hop to a new random guess if needed
         if rand < rho_hop
