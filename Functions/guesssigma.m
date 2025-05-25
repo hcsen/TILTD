@@ -1,0 +1,9 @@
+function sigma = guesssigma(p, k, theta, lb, ub)
+    % For a given fraction 'p' guess a value of sigma that should generate
+    % values that fall within bounds 'p' of the time.
+    f = @(sigma) mean( ...
+        (1 + k * (lb - theta) ./ sigma).^-1/k ...
+      - (1 + k * (ub - theta) ./ sigma).^-1/k ...
+    )-p;
+    sigma = fzero(f, 2);
+end
