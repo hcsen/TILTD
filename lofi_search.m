@@ -248,7 +248,8 @@ ub_store = zeros(Np, noDecision);
 objInd = zeros(1,Np);
 phaseSizes = zeros(1,Np);
 
-fprintf("Initial Optimisation.... Phase(%u/%u)\n", 1, Np);
+fprintf("Starting Initial Optimisation\n");
+fprintf("Initial (1).... Phase(%u / %u)\n", 1, Np);
 
 % First phase if starts on SOI
 if startBody == 1
@@ -305,7 +306,6 @@ end
 % Supply index of last final mass, or tell optimiser to optimise the
 % minimum flight time if no thrust arcs
 if whichThrust(1) == 1
-
     indLastMf = sizeX + 1;
     objInd(1) = indLastMf;
     [optimised,~,~,output] = fmincon(@(x)obj_lofiSF(x,indLastMf),x,A,b,Aeq,beq,lb,ub, @(x)con_lofiSF(x,consts), options);
@@ -320,7 +320,7 @@ end
 
 NpCurrent = 2;
 for i = 2:Np-1
-    fprintf("Initial Optimisation.... Phase(%u/%u)\n", i, Np);
+    fprintf("Initial (1).... Phase(%u / %u)\n", i, Np);
 
     sizeOptim = length(x);
     consts(7) = NpCurrent;
@@ -373,7 +373,7 @@ end
 
 %% Final phase
 
-fprintf("Initial Optimisation.... Phase(%u/%u)\n", Np, Np);
+fprintf("Initial (1).... Phase(%u / %u)\n", Np, Np);
 consts(7) = Np;
 
 sizeOptim = length(x);
@@ -425,7 +425,7 @@ else
     end
 end
 
-fprintf("Initial Optimisation.... Done\n");
+fprintf("Initial (1).... Done\n");
 
 optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
 m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
@@ -504,7 +504,6 @@ if MBH_noLoops>1
 
     % For resolving, know where optimising over dt and where mf
 
-%    [minViolation, iMinViolation] = min(nonzeros(violation_archive));
     minViolation = violation_archive(1);
     
     % Disable fmincon parallelisation here to avoid nesting parpool.
@@ -523,33 +522,41 @@ if MBH_noLoops>1
         end
         asyncsave(jobStorageLocation, 'best.mat', struct('best', best, 'minViolation', minViolation));
         parfor k = 2:MBH_noLoops-1
-            s = load(fullfile(jobStorageLocation, 'best.mat'), 'best');
-            best = s.best;
-            
-            [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
-    
-            % Re-check file, incase has been updated since. 
-            s = load(fullfile(jobStorageLocation, 'best.mat'), 'minViolation');
-            minViolation = s.minViolation;
+            try
+                s = load(fullfile(jobStorageLocation, 'best.mat'), 'best');
+                best = s.best;
 
-            if violation_archive(k) < minViolation
-                asyncsave(jobStorageLocation, 'best.mat', struct('best', optim_archive(k, :), 'minViolation', violation_archive(k)));
-                fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
-            else
-                fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+        
+                % Re-check file, incase has been updated since. 
+                s = load(fullfile(jobStorageLocation, 'best.mat'), 'minViolation');
+                minViolation = s.minViolation;
+    
+                if violation_archive(k) < minViolation
+                    asyncsave(jobStorageLocation, 'best.mat', struct('best', optim_archive(k, :), 'minViolation', violation_archive(k)));
+                    fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+                else
+                    fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+                end
+            catch E
+                disp(E);
             end
         end
         % Serial run to make sure final run of workers arnt left out.
         [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = f(MBH_noLoops, best);
     else
         for k = 2:MBH_noLoops
-            [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
-            if violation_archive(k) < minViolation
-                fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
-                best = optim_archive(k, :);
-                minViolation = violation_archive(k);
-            else
-                fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+            try
+                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+                if violation_archive(k) < minViolation
+                    fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+                    best = optim_archive(k, :);
+                    minViolation = violation_archive(k);
+                else
+                    fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
+                end
+            catch E
+                disp(E);
             end
         end
     end
