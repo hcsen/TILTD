@@ -26,9 +26,11 @@ for i = 1:length(varargin)
     eval(fileName{:});
 end
 
+rng(rng_seed);
+
 disp(["MBH: ", MBH_noLoops]);
 disp(["Parallel: ", use_parallel]);
-disp(["Seed: ", rng_seed]);
+disp(["Seed: ", rng().Seed]);
 
 rootDir = pwd;
 
@@ -54,7 +56,6 @@ if use_parallel
     end    
 end
 
-rng(rng_seed);
 
 % Keep track of some indices for MBH
 ind_vinfi = zeros(3, N_flybys);
