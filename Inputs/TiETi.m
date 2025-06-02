@@ -1,27 +1,27 @@
 % Celestial system
-N_perts = 4;                        % Number of perturbing bodies
+N_perts = 2;                        % Number of perturbing bodies
 centralBodyName = 'Saturn';            % Central body name in words
-pertNames = strsplit('Titan,Enceladus,Dione,Tethys', ',');       % Perturbing bodies in words
+pertNames = strsplit('Titan,Enceladus', ',');       % Perturbing bodies in words
 pertRelativeTo = 'SATURN BARYCENTER';     % System barycentre name in words
 
-Np = 3;                             % Number of trajectory phases
-N_flybys = 2;                       % Number of flybys
+Np = 2;                             % Number of trajectory phases
+N_flybys = 1;                       % Number of flybys
 
 % Flybys numbered 1,2,3 etc according to order given in pertNames
-flybySequence = [3,2];
-whichFlyby = [1,2];                   % List which phases end in a flyby
+flybySequence = [2];
+whichFlyby = [1];                   % List which phases end in a flyby
 
 % For start and end, 1 = SOI, 2 = orbit around central body, then index of the
 % perturbing bodies + 2. Start at SOI specified with RA and DEC, orbit
 % specified by Keplerian orbital elements a, AoP, e, inc, RAAN, t_anom.
 startBody = 3;
-endBody = 6;
+endBody = 3;
 
 N = 50;                              % Number of segments per trajectory phase
 
 N_ephem = 10000;                      % Number of points over which to get ephemeris data
-N_thrust = 3;                        % Number of thrust arcs
-whichThrust = [1,2,3];                 % List of which phases have thrust
+N_thrust = 2;                        % Number of thrust arcs
+whichThrust = [1,2];                 % List of which phases have thrust
 
 % Spacecraft info
 N_act = 1;                           % Number of active thrusters
@@ -43,7 +43,7 @@ G = 6.674e-20;                       % Gravitational constant in km^3 kg^-1 s^-2
 % Provide masses of central body all perturbing bodies in order given
 % before in kg
 m_central = 5.683e26;                % Central body mass (Saturn)
-m_perts = [1.345e23, 1.080e20, 1.095e21, 6.175e20];      % Titan, Enceladus, Dione, Tethys
+m_perts = [1.345e23, 1.080e20];      % Titan, Enceladus
 
 % Compute standard gravitational parameter of all perturbing bodies
 mu_central = m_central*G;            % Central body standard gravitational parameter in km^3/s^2
@@ -51,7 +51,7 @@ mu_perts = m_perts.*G;               % Perturbing bodies standard gravitational 
 
 % Radii of central body and perturbing bodies in km
 r_central = 58232;                  % Radius of central body in km (Saturn)
-r_perts = [2574.7, 252.1, 561.4, 536.3];   % Titan, Enceladus, Dione, Tethys
+r_perts = [2574.7, 252.1];          % Titan, Enceladus
 
 % Get sphere of influence radii
 d_Scent = 1.434e9;                  % Average distance of Sun to central body in km;
@@ -65,7 +65,7 @@ g0 = 9.81e-3;                        % Gravitational acceleration at Earth's sur
 % depend on the scales involved, eg orbital distance from central body
 
 MU = m0;                             % Initial mass in kg
-DU = 2.37948e5;                        % Distance unit in km
+DU = 1e5;                        % Distance unit in km
 TU = sqrt((DU^3)/mu_central);        % Time unit in s
 VU = DU/TU;                          % Velocity unit in km/s
 
@@ -77,8 +77,8 @@ VU = DU/TU;                          % Velocity unit in km/s
 % phase.
 % For final phase: vinfi but no vinff because not doing a GA
 
-h_mins = [50,50];                     % Minimum height above flyby body in km
-h_maxs = [10000,10000];                   % Maximum height above flyby body in km
+h_mins = [100];                     % Minimum height above flyby body in km
+h_maxs = [10000];                   % Maximum height above flyby body in km
 
 t_ephem_min = 'January 1 2035';      % Time to start fetching planetary ephemeris data, must be string of form Month d yyyy
 t_ephem_max = 'June 1 2035';      % End of time ephemeris data taken over
@@ -118,7 +118,7 @@ vi_bound = 5/VU;                     % Abs value of max/min initial velocity rel
 viRel_bound = 2/VU;                  % Initial velocity relative to a flyby body
 vf_bound = 2/VU;                     % Abs value of max/min final velocity relative to central body in VU
 vfRel_bound = 8/VU;                  % Final velocity relative to a flyby body
-vinf_bound = [1.5;1.5;1.5]/VU;               % Velocity bounds for all GA v_inf values
+vinf_bound = [3;1.5]/VU;               % Velocity bounds for all GA v_inf values
 
 % Bounds on points in free space. These are Cartesian coordinates defined
 % relative to the central body. Since space is so big, only use this if you
@@ -139,10 +139,10 @@ vz_free_max = 15/VU;
 
 % Set bounds for things present in every phase, one value for each per
 % phase
-dt_min = [3,0.9,1]*86400/TU;          % Minimum time of flight in TU
-dt_max = [7,3,5]*86400/TU;          % Maximum time of flight in TU
-mf_min = [12.5,12.5,12.5]/MU;                % Minimum final mass in MU
-mf_max = [14,14,14]/MU;                % Maximum final mass in MU
+dt_min = [1,1]*86400/TU;          % Minimum time of flight in TU
+dt_max = [7,3]*86400/TU;          % Maximum time of flight in TU
+mf_min = [12.5,12.5]/MU;                % Minimum final mass in MU
+mf_max = [14,14]/MU;                % Maximum final mass in MU
 
 t0Hop = 9*86400/TU;                % Max amount to hop launch epoch in TU
 dtHop = 0.2*86400/TU;                 % Max amount to hop time of flights in TU
