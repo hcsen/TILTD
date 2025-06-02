@@ -49,10 +49,12 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
         % TODO: This doesn't need to be done twice.
         % Also, don't know why scale factor is sigmas?
         perturbed = best + gprnd(MBH_tail, sigmas, 0) .* pm;
+        irand = rand;
+        fprintf('Random number %g, vs threshhold.\n', irand, rho_hop);
 
         % Hop to a new random guess if needed
-        if rand < rho_hop
-            disp('Random hop (%%%f)\n', 100/rho_hop);
+        if  irand < rho_hop
+            fprintf('Random hop (%%%f)\n', 100/rho_hop);
             % What is this doing.
             perturbed(1) = perturbed(1) + 2 * t0Hop * rand - t0Hop; % Hop the launch epoch
             for j = 1:Np
@@ -82,7 +84,7 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
 
         % Re-optimize phases
         for i = 1:Np
-            fprintf("MBH Hop (%u).... Phase(%u / %u)\n",k, i, Np);
+            fprintf("MBH Step (%u).... Phase(%u / %u)\n",k, i, Np);
 
             constsCopy(7) = i;
             x = perturbed(1:phaseSizes(i));
@@ -96,6 +98,6 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
             end
             perturbed(1:phaseSizes(i)) = optimised;
         end
-        fprintf("MBH Hop (%u).... Done\n",k);
+        fprintf("MBH Step (%u).... Done\n",k);
         constrviolation = output.constrviolation;
     end
