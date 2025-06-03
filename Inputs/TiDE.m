@@ -19,7 +19,7 @@ endBody = 4;
 
 N = 50;                              % Number of segments per trajectory phase
 
-N_ephem = 10000;                      % Number of points over which to get ephemeris data
+N_ephem = 8000;                      % Number of points over which to get ephemeris data
 N_thrust = 2;                        % Number of thrust arcs
 whichThrust = [1,2];                 % List of which phases have thrust
 
@@ -118,7 +118,7 @@ vi_bound = 5/VU;                     % Abs value of max/min initial velocity rel
 viRel_bound = 2/VU;                  % Initial velocity relative to a flyby body
 vf_bound = 2/VU;                     % Abs value of max/min final velocity relative to central body in VU
 vfRel_bound = 8/VU;                  % Final velocity relative to a flyby body
-vinf_bound = [3;1]/VU;               % Velocity bounds for all GA v_inf values
+vinf_bound = [1;1]/VU;               % Velocity bounds for all GA v_inf values
 
 % Bounds on points in free space. These are Cartesian coordinates defined
 % relative to the central body. Since space is so big, only use this if you
@@ -139,14 +139,14 @@ vz_free_max = 15/VU;
 
 % Set bounds for things present in every phase, one value for each per
 % phase
-dt_min = [1,1]*86400/TU;          % Minimum time of flight in TU
-dt_max = [9,4]*86400/TU;          % Maximum time of flight in TU
+dt_min = [1,0.3]*86400/TU;          % Minimum time of flight in TU
+dt_max = [7,0.5]*86400/TU;          % Maximum time of flight in TU
 mf_min = [12.5,12.5]/MU;                % Minimum final mass in MU
 mf_max = [14,14]/MU;                % Maximum final mass in MU
 
 t0Hop = 9*86400/TU;                % Max amount to hop launch epoch in TU
-dtHop = 0.2*86400/TU;                 % Max amount to hop time of flights in TU
-MBH_noLoops = 100;                  % Number of times to run
+dtHop = 0.3*86400/TU;                 % Max amount to hop time of flights in TU
+MBH_noLoops = 1;                  % Number of times to run
 rho_hop = 0.2;                      % Probability of a hop
 MBH_tail = 0.8;                     % MBH tail parameter
 MBH_theta = 1;                      % MBH threshold/location parameter
