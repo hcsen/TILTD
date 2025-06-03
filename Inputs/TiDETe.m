@@ -118,7 +118,7 @@ vi_bound = 5/VU;                     % Abs value of max/min initial velocity rel
 viRel_bound = 2/VU;                  % Initial velocity relative to a flyby body
 vf_bound = 2/VU;                     % Abs value of max/min final velocity relative to central body in VU
 vfRel_bound = 8/VU;                  % Final velocity relative to a flyby body
-vinf_bound = [1.5;1.5;1.5]/VU;               % Velocity bounds for all GA v_inf values
+vinf_bound = [2;2;2]/VU;               % Velocity bounds for all GA v_inf values
 
 % Bounds on points in free space. These are Cartesian coordinates defined
 % relative to the central body. Since space is so big, only use this if you
