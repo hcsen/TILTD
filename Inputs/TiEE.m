@@ -15,7 +15,7 @@ whichFlyby = [1];                   % List which phases end in a flyby
 % perturbing bodies + 2. Start at SOI specified with RA and DEC, orbit
 % specified by Keplerian orbital elements a, AoP, e, inc, RAAN, t_anom.
 startBody = 3;
-endBody = 3;
+endBody = 4;
 
 N = 50;                              % Number of segments per trajectory phase
 
