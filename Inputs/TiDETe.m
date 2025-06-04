@@ -31,7 +31,7 @@ Isp = 1700;                          % Isp in s
 m0 = 14;                            % Initial mass in kg
 
 % Tolerances for optimisation
-NLP_feas_tol = 1e-4;                 % NLP solver feasibility tolerance
+NLP_feas_tol = 1e-3;                 % NLP solver feasibility tolerance
 NLP_tol = 1e-1;                      % NLP solver optimality tolerance
 NLP_steptol = 1e-10;                 % Max NLP solver runtime
 NLP_iter_max = 10000;                % Max number of NLP solver major iterations
@@ -65,7 +65,7 @@ g0 = 9.81e-3;                        % Gravitational acceleration at Earth's sur
 % depend on the scales involved, eg orbital distance from central body
 
 MU = m0;                             % Initial mass in kg
-DU = 2.37948e5;                        % Distance unit in km
+DU = 1e4;                        % Distance unit in km
 TU = sqrt((DU^3)/mu_central);        % Time unit in s
 VU = DU/TU;                          % Velocity unit in km/s
 
