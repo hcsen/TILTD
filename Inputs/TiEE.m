@@ -31,7 +31,7 @@ Isp = 1700;                          % Isp in s
 m0 = 14;                            % Initial mass in kg
 
 % Tolerances for optimisation
-NLP_feas_tol = 1e-4;                 % NLP solver feasibility tolerance
+NLP_feas_tol = 1e-3;                 % NLP solver feasibility tolerance
 NLP_tol = 1e-1;                      % NLP solver optimality tolerance
 NLP_steptol = 1e-10;                 % Max NLP solver runtime
 NLP_iter_max = 10000;                % Max number of NLP solver major iterations
