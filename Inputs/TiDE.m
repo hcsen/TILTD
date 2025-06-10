@@ -146,7 +146,7 @@ mf_max = [14,14]/MU;                % Maximum final mass in MU
 
 t0Hop = 9*86400/TU;                % Max amount to hop launch epoch in TU
 dtHop = 0.3*86400/TU;                 % Max amount to hop time of flights in TU
-MBH_noLoops = 1;                  % Number of times to run
+MBH_noLoops = 100;                  % Number of times to run
 rho_hop = 0.2;                      % Probability of a hop
 MBH_tail = 0.8;                     % MBH tail parameter
 MBH_theta = 1;                      % MBH threshold/location parameter
