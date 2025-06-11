@@ -43,23 +43,31 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_t
         probSize = length(best);
 
         % Perturb all the decision variables
+        
+        % New method using std
+        % range = ub - lb;
+        % Change 0.25 (2 standard deviations) to variable.
+        % Keeping hardcoded now to avoid changing config.
+        % perturbed = normrnd(best, 0.25 * range); 
+
+        
+        % Old method.
         pm = fix(rand(1, probSize) + 0.5);
         pm(~pm) = -1;
-
-        % TODO: This doesn't need to be done twice.
-        % Also, don't know why scale factor is sigmas?
         perturbed = best + gprnd(MBH_tail, sigmas, 0) .* pm;
+        fprintf("Worker Seed: %u\n", rng().Seed);
         irand = rand;
-        fprintf('Random number %g, vs threshhold.\n', irand, rho_hop);
 
         % Hop to a new random guess if needed
         if  irand < rho_hop
-            fprintf('Random hop (%%%f)\n', 100/rho_hop);
+            fprintf('Hop (%f < %f)\n', irand, rho_hop);
             % What is this doing.
             perturbed(1) = perturbed(1) + 2 * t0Hop * rand - t0Hop; % Hop the launch epoch
             for j = 1:Np
                 perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2 * dtHop * rand - dtHop; % Hop each phase tof
             end
+        else
+            fprintf('No Hop (%f > %f)\n', irand, rho_hop);
         end
 
         outsideboundcount = 0;
