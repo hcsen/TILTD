@@ -557,6 +557,7 @@ if MBH_noLoops>1
                     fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                 end
             catch E
+                save(['.failed_worker_', str(k), '_', datestr(now, 'YYYYmmDDTHHMMSS'), '.mat']','-mat');
                 disp(E);
             end
         end
