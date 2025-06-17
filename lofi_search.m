@@ -252,15 +252,12 @@ lb_store = zeros(Np, noDecision);
 ub_store = zeros(Np, noDecision);
 objInd = zeros(1,Np);
 phaseSizes = zeros(1,Np);
-optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
-m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
-violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
-perturbed_archive = zeros(MBH_noLoops, length(optimised));
-
-times = zeros(MBH_noLoops, 1);
 
 fprintf("Starting Initial Optimisation\n");
 fprintf("Initial (1).... Phase(%u / %u)\n", 1, Np);
+
+% Time inital loop
+tStart = tic;
 
 % First phase if starts on SOI
 if startBody == 1
@@ -438,9 +435,17 @@ end
 
 fprintf("Initial (1).... Done\n");
 
-
+optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
+perturbed_archive = zeros(MBH_noLoops, length(optimised)); % Initial perturbtion in each iteration.
+m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
+violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
+dohop_archive = zeros(MBH_noLoops, 1);              % Did a hop occur.
+times = zeros(MBH_noLoops, 1);
 
 % Save to archive if the optimised trajectory is feasible
+perturbed_archive(1, :) = zeros(length(optimised),1);
+dohop_archive(1) = false;
+times(1) = toc(tStart);
 optim_archive(1,:) = optimised;         % Save all optimised decision variables
 m_archive(1) = m_optim;               % Save final mass from that optimised run
 violation_archive(1) = output.constrviolation;
@@ -531,32 +536,35 @@ if MBH_noLoops>1
         asyncsave(jobStorageLocation, 'best.mat', struct('best', best, 'minViolation', minViolation));
         parfor k = 2:MBH_noLoops-1
             try
+                tStart = tic;
                 s = load(fullfile(jobStorageLocation, 'best.mat'), 'best');
                 best = s.best;
 
-                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best, (loopSeeds(k)*(2^32)));
-        
+                [optim_archive(k, :), m_archive(k), violation_archive(k), perturbed_archive(k, :), dohop_archive(k)] = f(k, best, (loopSeeds(k)*(2^32)));
+                
+                times(k) = toc(tStart);
                 % Re-check file, incase has been updated since. 
                 s = load(fullfile(jobStorageLocation, 'best.mat'), 'minViolation');
                 minViolation = s.minViolation;
-    
+                
                 if violation_archive(k) < minViolation
                     asyncsave(jobStorageLocation, 'best.mat', struct('best', optim_archive(k, :), 'minViolation', violation_archive(k)));
                     fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                 else
                     fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                 end
+
             catch E
                 save(sprintf('.failed_worker_%u_%s.mat', k, datestr(now, 'YYYYmmDDTHHMMSS')),'-mat');
                 disp(E);
             end
-        end
-        % Serial run to make sure final run of workers arnt left out.
-        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = f(MBH_noLoops, best, (loopSeeds(MBH_noLoops)*(2^32)));
+        end   
     else
-        for k = 2:MBH_noLoops
+        for k = 2:MBH_noLoops-1
             try
-                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best, (loopSeeds(k)*(2^32)));
+                tStart = tic;
+                [optim_archive(k, :), m_archive(k), violation_archive(k), perturbed_archive(k, :), dohop_archive(k)] = f(k, best, (loopSeeds(k)*(2^32)));
+                times(k) = toc(tStart);
                 if violation_archive(k) < minViolation
                     fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                     best = optim_archive(k, :);
@@ -570,9 +578,19 @@ if MBH_noLoops>1
             end
         end
     end
+    
+    % This bit is redundant when not in parallel, 
+    % putting outside loop for clarity
+    [~,imin] = min(violation_archive);
+    best = optim_archive(imin, :);
+
+     % Serial run to make sure final run of workers arnt left out.
+    tStart = tic;
+    [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops), perturbed_archive(MBH_noLoops, :), dohop_archive(MBH_noLoops)] = f(MBH_noLoops, best, (loopSeeds(MBH_noLoops)*(2^32)));
+    times(MBH_noLoops) = toc(tStart);
 end
 
 output = struct('optim_archive', optim_archive, 'm_archive', m_archive, 'violation_archive', violation_archive, ...
-    'consts', consts, 'lb', lb, 'ub', ub);
+    'consts', consts, 'lb', lb, 'ub', ub, 'perturbed_archive', perturbed_archive, 'dohop_archive', dohop_archive, 'tmies', times);
 
 end

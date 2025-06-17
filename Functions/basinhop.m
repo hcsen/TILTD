@@ -1,7 +1,7 @@
-function [optimised, m_optim, constrviolation] = basinhop(k, best, seed, sigmas, MBH_tail, ...
+function [optimisedPhase, m_optim, constrviolation, perturbed, doHop] = basinhop(k, best, seed, sigmas, MBH_tail, ...
             rho_hop, t0Hop, dtHop, dtIndex, lb, ub, phaseSizes, objInd, whichThrust, consts, ...
             options, A, b, Aeq, beq, Np)
-
+        
         % Reseed from input param.
         rng(seed);
 
@@ -26,11 +26,12 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, seed, sigmas,
         pm = fix(rand(1, probSize) + 0.5);
         pm(~pm) = -1;
         perturbed = best + gprnd(MBH_tail, sigmas, 0) .* pm;
-        fprintf("Worker Seed: %u\n", rng().Seed);
+        fprintf("MBH Step Seed: %u\n", rng().Seed);
         irand = rand;
+        doHop = irand < rho_hop ;
 
         % Hop to a new random guess if needed
-        if  irand < rho_hop
+        if doHop
             fprintf('Hop (%f < %f)\n', irand, rho_hop);
             % What is this doing.
             perturbed(1) = perturbed(1) + 2 * t0Hop * rand - t0Hop; % Hop the launch epoch
@@ -60,22 +61,24 @@ function [optimised, m_optim, constrviolation] = basinhop(k, best, seed, sigmas,
         if outsideboundcount > 0
             fprintf('(%u / %u) perturbed values fell outside of bounds and were corrected.\n', outsideboundcount,  probSize);
         end
+            
+        optimised = perturbed;
 
         % Re-optimize phases
         for i = 1:Np
             fprintf("MBH Step (%u).... Phase(%u / %u)\n",k, i, Np);
 
             constsCopy(7) = i;
-            x = perturbed(1:phaseSizes(i));
+            x = optimised(1:phaseSizes(i));
             lbCurrent = lb(1:phaseSizes(i));
             ubCurrent = ub(1:phaseSizes(i));
 
             if any(i == whichThrust)
-                [optimised, ~, ~, output] = fmincon(@(x)obj_lofiSF(x, objInd(i)), x, A, b, Aeq, beq, lbCurrent, ubCurrent, @(x)con_lofiSF(x, constsCopy), options);
+                [optimisedPhase, m_optim, ~, output] = fmincon(@(x)obj_lofiSF(x, objInd(i)), x, A, b, Aeq, beq, lbCurrent, ubCurrent, @(x)con_lofiSF(x, constsCopy), options);
             else
-                [optimised, ~, ~, output] = fmincon(@(x)obj_lofiSF_coast(x, objInd(i)), x, A, b, Aeq, beq, lbCurrent, ubCurrent, @(x)con_lofiSF(x, constsCopy), options);
+                [optimisedPhase, m_optim, ~, output] = fmincon(@(x)obj_lofiSF_coast(x, objInd(i)), x, A, b, Aeq, beq, lbCurrent, ubCurrent, @(x)con_lofiSF(x, constsCopy), options);
             end
-            perturbed(1:phaseSizes(i)) = optimised;
+            optimised(1:phaseSizes(i)) = optimisedPhase;
         end
         fprintf("MBH Step (%u).... Done\n",k);
         constrviolation = output.constrviolation;
