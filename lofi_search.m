@@ -26,12 +26,6 @@ for i = 1:length(varargin)
     eval(fileName{:});
 end
 
-rng(rng_seed);
-
-disp(["MBH: ", MBH_noLoops]);
-disp(["Parallel: ", use_parallel]);
-disp(["Seed: ", rng().Seed]);
-
 rootDir = pwd;
 
 % User: add paths to your MICE library for SPICE
@@ -56,6 +50,16 @@ if use_parallel
     end    
 end
 
+rng(rng_seed);
+% Seeds for each worker to inherit.
+% By default, matlab does not seed it's workers independently.
+% Meaning Paralell execution is not deterministic.
+% Each loop of MBH (serial or par), should use the same seed.
+loopSeeds = rand(MBH_noLoops, 1);
+
+disp(["MBH: ", MBH_noLoops]);
+disp(["Parallel: ", use_parallel]);
+disp(["Seed: ", rng().Seed]);
 
 % Keep track of some indices for MBH
 ind_vinfi = zeros(3, N_flybys);
@@ -511,7 +515,7 @@ if MBH_noLoops>1
     options.UseParallel=false;
 
     % Define partial function to simplify loop.
-    f = @(k, best)basinhop(k, best, sigmas, MBH_tail, MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
+    f = @(k, best, seed)basinhop(k, best, seed, sigmas, MBH_tail, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np);
 
     %% MBH loop
     if use_parallel
@@ -527,7 +531,7 @@ if MBH_noLoops>1
                 s = load(fullfile(jobStorageLocation, 'best.mat'), 'best');
                 best = s.best;
 
-                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best, (loopSeeds(k)*(2^32)));
         
                 % Re-check file, incase has been updated since. 
                 s = load(fullfile(jobStorageLocation, 'best.mat'), 'minViolation');
@@ -540,15 +544,16 @@ if MBH_noLoops>1
                     fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                 end
             catch E
+                save(sprintf('.failed_worker_%u_%s.mat', k, datestr(now, 'YYYYmmDDTHHMMSS')),'-mat');
                 disp(E);
             end
         end
         % Serial run to make sure final run of workers arnt left out.
-        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = f(MBH_noLoops, best);
+        [optim_archive(MBH_noLoops, :), m_archive(MBH_noLoops), violation_archive(MBH_noLoops)] = f(MBH_noLoops, best, (loopSeeds(MBH_noLoops)*(2^32)));
     else
         for k = 2:MBH_noLoops
             try
-                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best);
+                [optim_archive(k, :), m_archive(k), violation_archive(k)] = f(k, best, (loopSeeds(k)*(2^32)));
                 if violation_archive(k) < minViolation
                     fprintf("New best value found, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                     best = optim_archive(k, :);
@@ -557,7 +562,7 @@ if MBH_noLoops>1
                     fprintf("Best value unchanged, %5.5G vs %5.5G\n", violation_archive(k), minViolation);
                 end
             catch E
-                save(['.failed_worker_', str(k), '_', datestr(now, 'YYYYmmDDTHHMMSS'), '.mat']','-mat');
+                save(sprintf('.failed_worker_%u_%s.mat', k, datestr(now, 'YYYYmmDDTHHMMSS')),'-mat');
                 disp(E);
             end
         end

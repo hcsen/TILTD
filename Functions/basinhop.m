@@ -1,38 +1,9 @@
-function [optimised, m_optim, constrviolation] = basinhop(k, best, sigmas, MBH_tail, ...
-        MBH_theta, rho_hop, t0Hop, dtHop, dtIndex, lb, ub, ind_vinfi, ind_vinff, s_v, N_flybys, ...
-        phaseSizes, objInd, whichThrust, consts, options, A, b, Aeq, beq, Np)
+function [optimised, m_optim, constrviolation] = basinhop(k, best, seed, sigmas, MBH_tail, ...
+            rho_hop, t0Hop, dtHop, dtIndex, lb, ub, phaseSizes, objInd, whichThrust, consts, ...
+            options, A, b, Aeq, beq, Np)
 
-
-        % k = index
-        % optimised = reduction variable
-        % sigmas = broadcast variable
-        % MBH_tail = broadcast variable
-        % MBH_theta = broadcast variable
-        % rho_hop = broadcast variable
-        % t0Hop = broadcast variable
-
-        % dtHop = broadcast variable
-        % dtIndex = broadcast variable
-        % lb = broadcast variable
-        % ub = broadcast variable
-        % ind_vinfi = broadcast variable
-        % ind_vinff = broadcast variable
-        % s_v = broadcast variable
-        % N_flybys = broadcast variable
-        % phaseSizes = broadcast variable
-        % objInd = broadcast variable
-        % whichThrust = broadcast variable
-        % constsCopy = INVALID
-        % options = broadcast variable
-        % A = broadcast variable
-        % b = broadcast variable
-        % Aeq = broadcast variable
-        % beq = broadcast variable
-        % Np = broadcast variable
-
-        % Reseed random based on index;
-        baserng = rng();
-        rng(baserng.Seed + k);
+        % Reseed from input param.
+        rng(seed);
 
         % Ensure all variables are local to avoid issues in parfor
         constsCopy = consts; % Avoid broadcast issues. TERRIBLE
