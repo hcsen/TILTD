@@ -252,6 +252,12 @@ lb_store = zeros(Np, noDecision);
 ub_store = zeros(Np, noDecision);
 objInd = zeros(1,Np);
 phaseSizes = zeros(1,Np);
+optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
+m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
+violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
+perturbed_archive = zeros(MBH_noLoops, length(optimised));
+
+times = zeros(MBH_noLoops, 1);
 
 fprintf("Starting Initial Optimisation\n");
 fprintf("Initial (1).... Phase(%u / %u)\n", 1, Np);
@@ -432,10 +438,7 @@ end
 
 fprintf("Initial (1).... Done\n");
 
-optim_archive = zeros(MBH_noLoops, length(optimised)); % For optimised decision variables at each iteration
-m_archive = zeros(MBH_noLoops, 1);                    % For final mass value with each iteration
-violation_archive = zeros(MBH_noLoops, 1);          % For the violation indicators with each iteration
-times = zeros(MBH_noLoops, 1);
+
 
 % Save to archive if the optimised trajectory is feasible
 optim_archive(1,:) = optimised;         % Save all optimised decision variables
