@@ -590,7 +590,31 @@ if MBH_noLoops>1
     times(MBH_noLoops) = toc(tStart);
 end
 
-output = struct('optim_archive', optim_archive, 'm_archive', m_archive, 'violation_archive', violation_archive, ...
-    'consts', consts, 'lb', lb, 'ub', ub, 'perturbed_archive', perturbed_archive, 'dohop_archive', dohop_archive, 'tmies', times);
+% Initialize output variables for constraint outputs.
+x_all = zeros(MBH_noLoops, Np, N+4);
+y_all = zeros(MBH_noLoops, Np, N+4);
+z_all = zeros(MBH_noLoops, Np, N+4);
+vx_all = zeros(MBH_noLoops, Np, N+4);
+vy_all = zeros(MBH_noLoops, Np, N+4);
+vz_all = zeros(MBH_noLoops, Np, N+4);
+m_all = zeros(MBH_noLoops, Np, N+2);
+t_all = zeros(MBH_noLoops, Np, N+4);
+delta_all = zeros(MBH_noLoops, N_flybys);
+
+% Call calculateconstraints on each run.
+for i = 1:MBH_noLoops
+    [x_all(i, :, :), y_all(i, :, :), z_all(i, :, :), vx_all(i, :, :),...
+     vy_all(i, :, :), vz_all(i, :, :), m_all(i, :, :), ...
+    t_all(i, :, :), delta_all(i), rp_all(i), c(i, :), ceq(i, :)] ...
+    = calculateconstraints(optim_archive(), consts);
+end
+
+output = struct('optim_archive', optim_archive, 'm_archive', m_archive, ...
+    'violation_archive', violation_archive, ...
+    'x_all', x_all, 'y_all', y_all, 'z_all', z_all, 'vx_all', vx_all, ...
+    'vy_all', vy_all, 'vz_all', vz_all, 'm_all', m_all, 't_all', t_all, ...
+    'delta_all', delta_all, 'rp_all', rp_all, 'c', c, 'ceq', ceq, 'consts', consts, 'lb', lb, ...
+    'ub', ub, 'perturbed_archive', perturbed_archive, 'dohop_archive', dohop_archive, 'times', times);
+
 
 end
