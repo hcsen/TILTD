@@ -590,7 +590,7 @@ if MBH_noLoops>1
     times(MBH_noLoops) = toc(tStart);
 end
 
-% Initialize output variables for constraint outputs.
+% Initialize variables for constraint outputs.
 x_all = zeros(MBH_noLoops, Np, N+4);
 y_all = zeros(MBH_noLoops, Np, N+4);
 z_all = zeros(MBH_noLoops, Np, N+4);
