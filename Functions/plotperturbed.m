@@ -1,28 +1,26 @@
-function plotperturbed(lowerBound, upperBound, best, MBH_sigma, doHop)
+function plotperturbed(best, perturbed, lowerBound, upperBound, doHop)
     % Aux function to help with determining a sensible sigma value.
     % Replicates peturbation logic, if changed in main script must be
     % changed here also.
-    size = length(best);
-
-    range = upperBound - lowerBound;
-    perturbed = normrnd(best, MBH_sigma .* range); 
-    if doHop
-        for j = 1:size
-            perturbed(dtIndex(j)) = perturbed(dtIndex(j)) + 2 * dtHop * rand - dtHop; % Hop each phase tof
-        end
-    end
-
-    fprintf("( %u / %u ) values generated outside range.\n", sum(perturbed < lowerBound | perturbed > upperBound), size)
+    [steps, length] = size(best);
 
     % First value is magnatudes different, is this right?
-    x = 2:size;
-    fill([x, fliplr(x)], [upperBound(2:end), fliplr(lowerBound(2:end))], [0.9 0.9 1], 'EdgeColor', 'none');
+    x = 2:length;
+
+    % If bounds given.
+    if ~isempty(lowerBound) && ~isempty(upperBound)
+        fill([x, fliplr(x)], [upperBound(2:end), fliplr(lowerBound(2:end))], [0.9 0.9 1], 'EdgeColor', 'none');
+    end
+            
     hold on;
-    plot(x, best(2:end), '-');
-    % plot(x, sigmas(2:end), '.');
+
+    cmap = colormap(sky(steps));
+    for i = 1:steps
+        plot(x, best(i, 2:end), '-', 'Color', cmap(i,:));
+        plot(x, perturbed(i, 2:end), '.', 'Color', cmap(i,:));   
+    end
     axis tight;
- 
-    plot(x, perturbed(2:end), 'x');      
+   
 
     legend('Range', 'Best', 'Perturbed');
     grid on;
