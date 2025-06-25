@@ -228,8 +228,10 @@ g0 = g0/(DU/(TU^2));                           % Acceleration due to gravity at 
 r_central = r_central/DU;
 r_flybys = r_flybys/DU;
 SOI = SOI/DU;
-h_mins = h_mins/DU;
-h_maxs = h_maxs/DU;
+
+% h_mins should already be in distance units.
+% h_mins = h_mins/DU;
+% h_maxs = h_maxs/DU;
 
 %% Optimise phase by phase
 A = [];               % A.x <= b
@@ -606,7 +608,7 @@ for i = 1:MBH_noLoops
     [x_all(i, :, :), y_all(i, :, :), z_all(i, :, :), vx_all(i, :, :),...
      vy_all(i, :, :), vz_all(i, :, :), m_all(i, :, :), ...
     t_all(i, :, :), delta_all(i), rp_all(i), c(i, :), ceq(i, :)] ...
-    = calculateconstraints(optim_archive(), consts);
+    = calculateconstraints(optim_archive(i,:), consts);
 end
 
 output = struct('optim_archive', optim_archive, 'm_archive', m_archive, ...
